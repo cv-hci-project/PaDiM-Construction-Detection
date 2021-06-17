@@ -27,4 +27,4 @@ def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False,
                             drop_last=True,
                             **additional_dataloader_args)
 
-    return dataloader, len(dataset)
+    return dataloader

@@ -1,2 +1,5 @@
 # Pycharm
 .idea/
+
+# Ignore local configs, makes it easier to have local paths to the dataset (for debugging etc.)
+configurations/local_*

@@ -5,7 +5,7 @@ exp_params:
   # data_path: "/cvhci/data/construction/SDNET2018"
   batch_size: 32
   crop_size: 224
-  arch: "resnet18"
+  backbone: "resnet18"
   number_of_embeddings: 100
   # number_train_batches: 1 # Keep uncommented to use all training batches
   # number_val_batches: 2
