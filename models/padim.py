@@ -15,15 +15,18 @@ class PaDiM(Module):
         self.backbone = backbone_models[backbone_architecture]()
         self.backbone.to(device)
 
-        self.number_of_patches = self.backbone.num_patches
+        self.number_of_patches = self.backbone.number_of_patches
         self.number_of_embeddings = number_of_embeddings
 
         self.means = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings)).to(self.device)
-        )
+            torch.zeros((self.number_of_patches, self.number_of_embeddings)),
+            requires_grad=False
+        ).to(self.device)
+
         self.covariances = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)).to(self.device)
-        )
+            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)),
+            requires_grad=False
+        ).to(self.device)
 
         self.embedding_ids = torch.randperm(self.backbone.embeddings_size)[:number_of_embeddings].to(self.device)
 
@@ -33,8 +36,8 @@ class PaDiM(Module):
         self.calculated_covariances = None
 
     def calculate_means_and_covariances(self):
-        self.calculated_means = self.means.clone()
-        self.calculated_covariances = self.covariances.clone()
+        self.calculated_means = self.means.clone().to(self.device)
+        self.calculated_covariances = self.covariances.clone().to(self.device)
 
         epsilon = 0.01
 

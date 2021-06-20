@@ -3,3 +3,6 @@
 
 # Ignore local configs, makes it easier to have local paths to the dataset (for debugging etc.)
 configurations/local_*
+
+# Ignore logs
+logs/

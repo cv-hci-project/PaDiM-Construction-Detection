@@ -1,1 +1,1 @@
-from padim import PaDiM
+from .padim import PaDiM

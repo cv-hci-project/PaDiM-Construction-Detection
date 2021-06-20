@@ -1,9 +1,11 @@
 import argparse
+import os
 
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import yaml
+from test_tube import Experiment
 from tqdm import tqdm
 
 from models import PaDiM
@@ -25,6 +27,13 @@ def main():
             config = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
+
+    experiment = Experiment(
+        save_dir=config['logging_params']['save_dir'],
+        name=config['logging_params']['name'],
+        debug=False,
+        create_git_tag=False
+    )
 
     # For reproducibility
     torch.manual_seed(config['logging_params']['manual_seed'])
@@ -57,6 +66,8 @@ def main():
         padim(batch)
 
     padim.calculate_means_and_covariances()
+
+    torch.save(padim.state_dict(), os.path.join(experiment.get_logdir(), "padim.pt"))
 
 
 if __name__ == "__main__":
