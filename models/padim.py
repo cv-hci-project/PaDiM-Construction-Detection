@@ -30,7 +30,10 @@ class PaDiM(Module):
             requires_grad=False
         )
 
-        self.embedding_ids = torch.randperm(self.backbone.embeddings_size)[:self.number_of_embeddings].to(self.device)
+        self.embedding_ids = Parameter(
+            torch.randperm(self.backbone.embeddings_size)[:self.number_of_embeddings].to(self.device),
+            requires_grad=False
+        )
 
         self.n = 0
 
