@@ -4,3 +4,6 @@ numpy
 PyYAML
 tqdm
 test_tube
+matplotlib
+scipy
+scikit-learn

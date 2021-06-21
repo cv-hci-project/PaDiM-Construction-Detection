@@ -35,6 +35,11 @@ def main():
         create_git_tag=False
     )
 
+    # Save the config
+    log_dir = experiment.get_logdir().split("tf")[0]
+    with open(os.path.join(log_dir, "configuration.yaml"), "w") as outfile:
+        yaml.dump(config, outfile, default_flow_style=False)
+
     # For reproducibility
     torch.manual_seed(config['logging_params']['manual_seed'])
     np.random.seed(config['logging_params']['manual_seed'])
@@ -67,7 +72,8 @@ def main():
 
     padim.calculate_means_and_covariances()
 
-    torch.save(padim.state_dict(), os.path.join(experiment.get_logdir(), "padim.pt"))
+    # Saves the trained model inside the logging directory
+    torch.save(padim.state_dict(), os.path.join(log_dir, "padim.pt"))
 
 
 if __name__ == "__main__":
