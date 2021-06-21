@@ -6,3 +6,5 @@ configurations/local_*
 
 # Ignore logs
 logs/
+
+__pycache__/
