@@ -116,7 +116,6 @@ def main():
     padim.eval()
 
     crop_size = validation_config["exp_params"]["crop_size"]
-    batch_count = validation_config["exp_params"]["batch_count"]
     batch_size = validation_config["exp_params"]["batch_size"]
 
     config["exp_params"]["batch_size"] = batch_size
@@ -128,7 +127,12 @@ def main():
                                               transform=transform)
 
     try:
-        assert batch_count < len(normal_data_dataloader) and batch_count < len(abnormal_data_dataloader)
+        batch_count = validation_config["exp_params"]["batch_count"]
+    except KeyError:
+        batch_count = min(len(normal_data_dataloader), len(abnormal_data_dataloader))
+
+    try:
+        assert batch_count <= len(normal_data_dataloader) and batch_count <= len(abnormal_data_dataloader)
     except AssertionError:
         print("Chosen batch count '{}' is larger than there are available batches for the".format(batch_count) +
               " validation sets.")

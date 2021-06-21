@@ -35,6 +35,8 @@ def main():
         create_git_tag=False
     )
 
+    print("Started experiment version {}".format(experiment.version))
+
     # Save the config
     log_dir = experiment.get_logdir().split("tf")[0]
     with open(os.path.join(log_dir, "configuration.yaml"), "w") as outfile:
@@ -58,7 +60,22 @@ def main():
     normal_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=False, shuffle=True,
                                             transform=transform)
 
-    for batch_id, (batch, _) in tqdm(enumerate(normal_data_dataloader), total=len(normal_data_dataloader)):
+    try:
+        batch_count = config["exp_params"]["batch_count"]
+    except KeyError:
+        batch_count = len(normal_data_dataloader)
+
+    try:
+        assert batch_count <= len(normal_data_dataloader)
+    except AssertionError:
+        print("Chosen batch count '{}' is larger than there are available batches for the".format(batch_count) +
+              " validation set.")
+        raise
+
+    normal_data_iterator = iter(normal_data_dataloader)
+
+    for _ in tqdm(range(batch_count)):
+        batch, _ = next(normal_data_iterator)
         padim(batch)
 
     padim.calculate_means_and_covariances()
