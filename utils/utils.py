@@ -37,7 +37,7 @@ def get_roc_plot_and_threshold(scores, gt_list):
     return (fig, ax), best_threshold
 
 
-def denormalization_for_pretrained(x):
+def denormalization_for_pretrained(x: np.ndarray):
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
     x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)

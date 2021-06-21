@@ -16,7 +16,7 @@ from utils.utils import (transforms_for_pretrained, get_roc_plot_and_threshold, 
 
 
 def create_img_subplot(img, img_score, threshold, vmin, vmax):
-    img = denormalization_for_pretrained(img)
+    img = denormalization_for_pretrained(img.cpu().numpy())
     # gt = gts[i].transpose(1, 2, 0).squeeze()
     # heat_map = scores[i] * 255
     heat_map = np.copy(img_score)
