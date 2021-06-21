@@ -1,26 +1,16 @@
 import argparse
-from typing import Tuple
 import os
-import pickle
+
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from torch import Tensor
-from tqdm import tqdm
 import yaml
+from test_tube import Experiment
+from tqdm import tqdm
 
-from backbones import backbone_models
+from models import PaDiM
 from utils.dataloader_utils import get_dataloader
-from utils.utils import transforms_for_pretrained, get_embedding
-
-
-def setup_padim(backbone: torch.nn.Module, number_of_embeddings, device) -> Tuple[Tensor, Tensor, Tensor]:
-    means = torch.zeros((backbone.num_patches, number_of_embeddings)).to(device)
-    covariances = torch.zeros((backbone.num_patches, number_of_embeddings, number_of_embeddings)).to(device)
-
-    embedding_ids = torch.randperm(backbone.embeddings_size)[:number_of_embeddings].to(device)
-
-    return means, covariances, embedding_ids
+from utils.utils import transforms_for_pretrained
 
 
 def main():
@@ -38,8 +28,13 @@ def main():
         except yaml.YAMLError as exc:
             print(exc)
 
-    # For save_dir
-    train_feature_filepath = os.path.join(config['logging_params']['save_dir'], 'train_%s.pkl' % config['logging_params']['name'])
+    experiment = Experiment(
+        save_dir=config['logging_params']['save_dir'],
+        name=config['logging_params']['name'],
+        debug=False,
+        create_git_tag=False
+    )
+
     # For reproducibility
     torch.manual_seed(config['logging_params']['manual_seed'])
     np.random.seed(config['logging_params']['manual_seed'])
@@ -59,14 +54,8 @@ def main():
 
     print("Device in use: {}".format(device))
 
-    backbone = backbone_models[config['exp_params']['backbone']]()
-    backbone.to(device)
-
-    number_of_embeddings = config['exp_params']["number_of_embeddings"]
-    number_of_patches = backbone.num_patches
-
-    means, covariances, embedding_ids = setup_padim(backbone, number_of_embeddings, device)
-    n = 0
+    padim = PaDiM(backbone_architecture=config['exp_params']['backbone'],
+                  number_of_embeddings=config['exp_params']["number_of_embeddings"], device=device)
 
     transform = transforms_for_pretrained(crop_size=config["exp_params"]["crop_size"])
 
@@ -74,46 +63,12 @@ def main():
                                             transform=transform)
 
     for batch_id, (batch, _) in tqdm(enumerate(normal_data_dataloader), total=len(normal_data_dataloader)):
+        padim(batch)
 
-        batch = batch.to(device)
+    padim.calculate_means_and_covariances()
 
-        with torch.no_grad():
-            features_1, features_2, features_3 = backbone(batch)
+    torch.save(padim.state_dict(), os.path.join(experiment.get_logdir(), "padim.pt"))
 
-        embeddings = get_embedding(features_1, features_2, features_3, embedding_ids)
-        B, C, H, W = embeddings.size()
-
-        embeddings = embeddings.view(-1, number_of_embeddings, number_of_patches)
-
-        for i in range(number_of_patches):
-            patch_embeddings = embeddings[:, :, i]  # b * c
-            for j in range(B):
-                covariances[i, :, :] += torch.outer(
-                    patch_embeddings[j, :],
-                    patch_embeddings[j, :])  # c * c
-            means[i, :] += patch_embeddings.sum(dim=0)  # c
-        n += B  # number of images
-
-    _means = means.clone()
-    _covs = covariances.clone()
-
-    epsilon = 0.01
-
-    identity = torch.eye(number_of_embeddings).to(device)
-    _means /= n
-
-    for i in range(number_of_patches):
-        _covs[i, :, :] -= n * torch.outer(_means[i, :], _means[i, :])
-        _covs[i, :, :] /= n - 1  # corrected covariance
-        _covs[i, :, :] += epsilon * identity  # constant term
-
-    # self.means = torch.nn.Parameter(means, requires_grad=False).to(self.device)
-    # self.covs = torch.nn.Parameter(covs, requires_grad=False).to(self.device)
-    # self.covs_inv = torch.nn.Parameter(torch.from_numpy(np.linalg.inv(self.covs.cpu().numpy())),
-    #                                    requires_grad=False).to(self.device)
-    train_outputs = [_means, _covs]
-    with open(train_feature_filepath, 'wb') as f:
-        pickle.dump(train_outputs, f, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     main()
