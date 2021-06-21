@@ -1,23 +1,7 @@
 exp_params:
-  dataset: concrete-cracks
-  data_path: "/home/lei/Desktop/project-cvhci/data/Concrete-Crack-Images"
-  # dataset: SDNET2018
-  # data_path: "/home/lei/Desktop/project-cvhci/data/SDNET2018"
   batch_size: 10
-  batch_number: 10
+  batch_count: 1000
   crop_size: 224
-  backbone: "resnet18"
-  number_of_embeddings: 100
-  # number_train_batches: 1 # Keep uncommented to use all training batches
-  # number_val_batches: 2
-  dataloader_workers: 4
 
 trainer_params:
-  gpu: 0
-  max_epochs: 1 # One epoch is enough because PaDiM needs to see each training sample only once
-
-logging_params:
-  save_dir: "/home/lei/Desktop/project-cvhci/code/PaDiM-Construction-Detection-master/logs/"
-  img_save_dir: "/home/lei/Desktop/project-cvhci/code/PaDiM-Construction-Detection-master/Validation_Result/"
-  name: "PaDiM-WideResNet-50_2"
-  manual_seed: 100
+  gpu: -1

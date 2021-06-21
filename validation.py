@@ -1,45 +1,22 @@
-import pickle
-from torch import Tensor
-from tqdm import tqdm
+import argparse
+import os
+
 import matplotlib
 import numpy as np
 import torch
 import yaml
-import os
-import argparse
 from matplotlib import pyplot as plt
 from skimage.segmentation import mark_boundaries
-from skimage import morphology
+from tqdm import tqdm
 
-from backbones import backbone_models
 from models import PaDiM
 from utils.dataloader_utils import get_dataloader, get_device
-from utils.utils import transforms_for_pretrained, get_embedding, calculate_score_map, get_roc_plot_and_threshold
+from utils.utils import (transforms_for_pretrained, get_roc_plot_and_threshold, denormalization_for_pretrained,
+                         create_mask)
 
-def denormalization(x):
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    x = x.numpy()
-    x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
-
-    return x
-
-def create_mask(img_score: np.ndarray, threshold):
-    idx_above_threshold = img_score > threshold
-    idx_below_threshold = img_score <= threshold
-
-    mask = img_score
-    mask[idx_above_threshold] = 1
-    mask[idx_below_threshold] = 0
-
-    kernel = morphology.disk(4)
-    mask = morphology.opening(mask, kernel)
-    # mask *= 255
-
-    return mask
 
 def create_img_subplot(img, img_score, threshold, vmin, vmax):
-    img = denormalization(img)
+    img = denormalization_for_pretrained(img)
     # gt = gts[i].transpose(1, 2, 0).squeeze()
     # heat_map = scores[i] * 255
     heat_map = np.copy(img_score)
@@ -81,6 +58,7 @@ def create_img_subplot(img, img_score, threshold, vmin, vmax):
 
     return fig_img, ax_img
 
+
 def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path):
     figures = []
     num = len(scores)
@@ -93,23 +71,8 @@ def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path
 
         fig_img, ax_img = create_img_subplot(batch[i], scores[i], threshold=threshold, vmin=vmin,
                                              vmax=vmax)
-        name = "Validation_{}_Image_Classified_as_{}_{}.png".format(int(label[i]), classified_as, i+batch_id*num)
+        name = "Validation_{}_Image_Classified_as_{}_{}.png".format(int(label[i]), classified_as, i + batch_id * num)
         fig_img.savefig(os.path.join(path, name), dpi=100)
-
-def validation_step(batch, backbone, number_of_embeddings, number_of_patches, _means, _covs, crop_size, device):
-
-    batch = batch.to(device)
-    with torch.no_grad():
-        features_1, features_2, features_3 = backbone(batch)
-
-    embedding_ids = torch.randperm(backbone.embeddings_size)[:number_of_embeddings].to(device)
-    embeddings = get_embedding(features_1, features_2, features_3, embedding_ids, device)
-    B, C, H, W = embeddings.size()
-    embeddings = embeddings.view(-1, number_of_embeddings, number_of_patches)
-
-    scores = calculate_score_map(embeddings.cpu(), (B, C, H, W), _means.cpu(), _covs.cpu(),
-                                 crop_size, min_max_norm=True)
-    return torch.Tensor(scores)
 
 
 def main():
@@ -138,15 +101,10 @@ def main():
         except yaml.YAMLError as exc:
             print(exc)
 
+    image_savepath = os.path.join(args.experiment_dir, "validation")
+    os.makedirs(image_savepath, exist_ok=True)
 
-    #trained_feature_filepath = os.path.join(config['logging_params']['save_dir'], 'train_%s.pkl' % config['logging_params']['name'])
-    #image_savepath = config['logging_params']['img_save_dir']
-    #number_of_embeddings = config['exp_params']["number_of_embeddings"]
-    #crop_size = config["exp_params"]["crop_size"]
-    #batch_number = config["exp_params"]["batch_number"]
-    #batch_size = config["exp_params"]["batch_size"]
-
-    gpu_id = validation_config["validation_params"]["gpu"]
+    gpu_id = validation_config["trainer_params"]["gpu"]
     device = get_device(gpu_id)
 
     print("Device in use: {}".format(device))
@@ -161,11 +119,23 @@ def main():
     batch_count = validation_config["exp_params"]["batch_count"]
     batch_size = validation_config["exp_params"]["batch_size"]
 
+    config["exp_params"]["batch_size"] = batch_size
+
     transform = transforms_for_pretrained(crop_size=crop_size)
     normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False,
                                             transform=transform)
     abnormal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=True,
                                               transform=transform)
+
+    try:
+        assert batch_count < len(normal_data_dataloader) and batch_count < len(abnormal_data_dataloader)
+    except AssertionError:
+        print("Chosen batch count '{}' is larger than there are available batches for the".format(batch_count) +
+              " validation sets.")
+        raise
+
+    normal_data_iterator = iter(normal_data_dataloader)
+    abnormal_data_iterator = iter(abnormal_data_dataloader)
 
     gt_n_tensor = torch.zeros((batch_count, batch_size, 1))
     gt_a_tensor = torch.ones((batch_count, batch_size, 1))
@@ -175,19 +145,19 @@ def main():
     batch_abnormal = torch.zeros((batch_count, batch_size, 3, crop_size, crop_size))
     # calculate score map
     for i in tqdm(range(batch_count)):
-        batch_n = next(normal_data_dataloader)[0]
-        batch_a = next(abnormal_data_dataloader)[0]
+        batch_n = next(normal_data_iterator)[0]
+        batch_a = next(abnormal_data_iterator)[0]
         batch_normal[i] = batch_n
         batch_abnormal[i] = batch_a
-        scores_n_tensor[i] = validation_step(batch_n, backbone, number_of_embeddings, number_of_patches, _means, _covs, crop_size, device)
-        scores_a_tensor[i] = validation_step(batch_a, backbone, number_of_embeddings, number_of_patches, _means, _covs, crop_size, device)
+        scores_n_tensor[i] = padim(batch_n)
+        scores_a_tensor[i] = padim(batch_a)
 
     scores_all = torch.cat([scores_n_tensor, scores_a_tensor], 0)
     bn, bz, cs1, cs2 = scores_all.shape
-    scores_all = scores_all.reshape(bn*bz, cs1, cs2)
+    scores_all = scores_all.reshape(bn * bz, cs1, cs2)
 
     gt_all = torch.cat([gt_n_tensor, gt_a_tensor], 0)
-    gt_all = gt_all.reshape(bn*bz, 1)
+    gt_all = gt_all.reshape(bn * bz, 1)
 
     v_max = scores_all.max()
     v_min = scores_all.min()
@@ -195,7 +165,7 @@ def main():
     # calculate metrics
     (fig, _), best_threshold = get_roc_plot_and_threshold(scores_all, gt_all)
     fig.savefig(os.path.join(image_savepath, 'roc_curve.png'), dpi=100)
-    print("Saved ROC  images to {}".format(image_savepath))
+    print("Saved ROC to {}".format(image_savepath))
 
     for i in tqdm(range(batch_count)):
         scores_n = scores_n_tensor[i]

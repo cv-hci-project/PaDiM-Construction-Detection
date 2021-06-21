@@ -5,6 +5,7 @@ from torchvision import transforms
 from matplotlib import pyplot as plt
 from scipy.spatial.distance import mahalanobis
 from scipy.ndimage import gaussian_filter
+from skimage import morphology
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve
@@ -79,6 +80,7 @@ def get_embedding(features_1, features_2, features_3, embedding_ids, device):
 
     return embedding
 
+
 def _calculate_dist_list(embedding, embedding_dimensions: tuple, means, covs):
     B, C, H, W = embedding_dimensions
 
@@ -92,6 +94,7 @@ def _calculate_dist_list(embedding, embedding_dimensions: tuple, means, covs):
     dist_list = np.array(dist_list).transpose((1, 0)).reshape((B, H, W))
 
     return dist_list
+
 
 def calculate_score_map(embedding, embedding_dimensions: tuple, means, covs, crop_size, min_max_norm: bool):
     dist_list = _calculate_dist_list(embedding, embedding_dimensions, means, covs)
@@ -114,3 +117,18 @@ def calculate_score_map(embedding, embedding_dimensions: tuple, means, covs, cro
         scores = score_map
 
     return scores
+
+
+def create_mask(img_score: np.ndarray, threshold):
+    idx_above_threshold = img_score > threshold
+    idx_below_threshold = img_score <= threshold
+
+    mask = img_score
+    mask[idx_above_threshold] = 1
+    mask[idx_below_threshold] = 0
+
+    kernel = morphology.disk(4)
+    mask = morphology.opening(mask, kernel)
+    # mask *= 255
+
+    return mask
