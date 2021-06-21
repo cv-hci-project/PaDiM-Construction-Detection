@@ -21,34 +21,34 @@ class PaDiM(Module):
         self.number_of_embeddings = params["number_of_embeddings"]
 
         self.means = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings)),
+            torch.zeros((self.number_of_patches, self.number_of_embeddings)).to(self.device),
             requires_grad=False
-        ).to(self.device)
+        )
 
         self.covariances = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)),
+            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)).to(self.device),
             requires_grad=False
-        ).to(self.device)
+        )
 
         self.embedding_ids = torch.randperm(self.backbone.embeddings_size)[:self.number_of_embeddings].to(self.device)
 
         self.n = 0
 
         self.learned_means = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings)),
+            torch.zeros((self.number_of_patches, self.number_of_embeddings)).to(self.device),
             requires_grad=False
-        ).to(self.device)
+        )
 
         self.learned_covariances = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)),
+            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)).to(self.device),
             requires_grad=False
-        ).to(self.device)
+        )
 
         self.crop_size = params["crop_size"]
 
     def calculate_means_and_covariances(self):
-        self.learned_means = Parameter(self.means.clone(), requires_grad=False).to(self.device)
-        self.learned_covariances = Parameter(self.covariances.clone(), requires_grad=False).to(self.device)
+        self.learned_means = Parameter(self.means.clone().to(self.device), requires_grad=False)
+        self.learned_covariances = Parameter(self.covariances.clone().to(self.device), requires_grad=False)
 
         epsilon = 0.01
 
