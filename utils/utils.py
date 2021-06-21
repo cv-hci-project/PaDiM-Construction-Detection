@@ -84,6 +84,8 @@ def get_embedding(features_1, features_2, features_3, embedding_ids, device):
 def _calculate_dist_list(embedding, embedding_dimensions: tuple, means, covs):
     B, C, H, W = embedding_dimensions
 
+    batched_dist_list = _calculate_dist_list_batched(embedding, embedding_dimensions, means, covs)
+
     dist_list = []
     for i in range(H * W):
         mean = means[i, :]
@@ -94,6 +96,51 @@ def _calculate_dist_list(embedding, embedding_dimensions: tuple, means, covs):
     dist_list = np.array(dist_list).transpose((1, 0)).reshape((B, H, W))
 
     return dist_list
+
+
+def _calculate_dist_list_batched(embedding, embedding_dimensions: tuple, means, covs):
+    b, c, h, w = embedding_dimensions
+    results = []
+    inverse_covariances = torch.linalg.inv(covs).numpy()
+    # _means = means.numpy()
+    # _inverse_covariances()
+    # _
+
+    for i in range(b):
+        # Shape: 100 x (56 * 56)
+        test_embedding = embedding[i]
+
+        # means.T shape: 100 x (56 * 56)
+        delta = test_embedding - means.T
+
+        # delta shape : (56 * 56) x 100
+        delta = delta.T.numpy()
+
+        # Shape: (56 * 56) x 100 x 100
+
+
+        #intermediate = np.einsum('ij,ijj->ij', delta, inverse_covariances)
+
+        #results.append(np.einsum('ij,ij->i', intermediate, delta))
+
+        results.append(np.sqrt(np.einsum('ij,ijj,ij->i', delta, inverse_covariances, delta)))
+
+    results = np.array(results, dtype=np.float32).reshape((b, h, w))
+
+    return results
+
+
+    """
+    n: (56 * 56)
+    j: 100
+    k: 100 * 100
+    """
+    D = np.sqrt(np.einsum('nj,jk,nk->n', delta, VI, delta))
+
+    """
+    Mahalanobis: sqrt((x_ij - mu_ij).T * inv_cov_ij * (x_ij - mu_ij))
+    
+    """
 
 
 def calculate_score_map(embedding, embedding_dimensions: tuple, means, covs, crop_size, min_max_norm: bool):
