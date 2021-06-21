@@ -7,3 +7,4 @@ test_tube
 matplotlib
 scipy
 scikit-learn
+scikit-image

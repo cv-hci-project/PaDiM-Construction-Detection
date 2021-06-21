@@ -9,7 +9,7 @@ from test_tube import Experiment
 from tqdm import tqdm
 
 from models import PaDiM
-from utils.dataloader_utils import get_dataloader
+from utils.dataloader_utils import get_dataloader, get_device
 from utils.utils import transforms_for_pretrained
 
 
@@ -47,20 +47,11 @@ def main():
     cudnn.benchmark = False
 
     gpu_id = config["trainer_params"]["gpu"]
-
-    if gpu_id >= 0:
-        device = torch.device('cuda:{}'.format(gpu_id))
-
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "Chose gpu_id '{}', but no GPU is available. If you want to use the CPU, set it to '-1'".format(gpu_id))
-    else:
-        device = torch.device('cpu')
+    device = get_device(gpu_id)
 
     print("Device in use: {}".format(device))
 
-    padim = PaDiM(backbone_architecture=config['exp_params']['backbone'],
-                  number_of_embeddings=config['exp_params']["number_of_embeddings"], device=device)
+    padim = PaDiM(params=config["exp_params"], device=device)
 
     transform = transforms_for_pretrained(crop_size=config["exp_params"]["crop_size"])
 

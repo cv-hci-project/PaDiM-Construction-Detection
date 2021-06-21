@@ -7,16 +7,18 @@ from utils.utils import get_embedding
 
 class PaDiM(Module):
 
-    def __init__(self, backbone_architecture: str, number_of_embeddings: int, device):
+    def __init__(self, params: dict, device):
         super().__init__()
 
         self.device = device
 
-        self.backbone = backbone_models[backbone_architecture]()
+        self.params = params
+
+        self.backbone = backbone_models[params["backbone"]]()
         self.backbone.to(device)
 
         self.number_of_patches = self.backbone.number_of_patches
-        self.number_of_embeddings = number_of_embeddings
+        self.number_of_embeddings = params["number_of_embeddings"]
 
         self.means = Parameter(
             torch.zeros((self.number_of_patches, self.number_of_embeddings)),
@@ -28,7 +30,7 @@ class PaDiM(Module):
             requires_grad=False
         ).to(self.device)
 
-        self.embedding_ids = torch.randperm(self.backbone.embeddings_size)[:number_of_embeddings].to(self.device)
+        self.embedding_ids = torch.randperm(self.backbone.embeddings_size)[:self.number_of_embeddings].to(self.device)
 
         self.n = 0
 

@@ -9,6 +9,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve
 
+
 def get_roc_plot_and_threshold(scores, gt_list):
     # calculate image-level ROC AUC score
     img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)

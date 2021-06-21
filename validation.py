@@ -12,7 +12,8 @@ from skimage.segmentation import mark_boundaries
 from skimage import morphology
 
 from backbones import backbone_models
-from utils.dataloader_utils import get_dataloader
+from models import PaDiM
+from utils.dataloader_utils import get_dataloader, get_device
 from utils.utils import transforms_for_pretrained, get_embedding, calculate_score_map, get_roc_plot_and_threshold
 
 def denormalization(x):
@@ -109,67 +110,71 @@ def validation_step(batch, backbone, number_of_embeddings, number_of_patches, _m
     scores = calculate_score_map(embeddings.cpu(), (B, C, H, W), _means.cpu(), _covs.cpu(),
                                  crop_size, min_max_norm=True)
     return torch.Tensor(scores)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Validate a PaDiM model')
-    parser.add_argument('--config', '-c',
-                        dest="filename",
-                        metavar='FILE',
-                        help='Path to the configuration file',
+    parser.add_argument('--load', '-l',
+                        dest="experiment_dir",
+                        metavar='EXP_DIR',
+                        help='Path to the experiment folder, containing a trained PaDiM model')
+    parser.add_argument('--validation_config', '-vc',
+                        dest="validation_config",
+                        metavar='VAL_CFG',
+                        help='Path to a validation config to overwrite some parameters of the original experiment',
                         default='configurations/validation.yaml')
 
     args = parser.parse_args()
-    with open(args.filename, 'r') as file:
+
+    with open(os.path.join(args.experiment_dir, "configuration.yaml"), 'r') as file:
         try:
             config = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
 
-    trained_feature_filepath = os.path.join(config['logging_params']['save_dir'], 'train_%s.pkl' % config['logging_params']['name'])
-    image_savepath = config['logging_params']['img_save_dir']
-    number_of_embeddings = config['exp_params']["number_of_embeddings"]
-    crop_size = config["exp_params"]["crop_size"]
-    batch_number = config["exp_params"]["batch_number"]
-    batch_size = config["exp_params"]["batch_size"]
+    with open(args.validation_config, 'r') as file:
+        try:
+            validation_config = yaml.safe_load(file)
+        except yaml.YAMLError as exc:
+            print(exc)
 
 
-    # load model
-    print('load train set feature from: %s' % trained_feature_filepath)
-    with open(trained_feature_filepath, 'rb') as f:
-        _means, _covs, = pickle.load(f)
+    #trained_feature_filepath = os.path.join(config['logging_params']['save_dir'], 'train_%s.pkl' % config['logging_params']['name'])
+    #image_savepath = config['logging_params']['img_save_dir']
+    #number_of_embeddings = config['exp_params']["number_of_embeddings"]
+    #crop_size = config["exp_params"]["crop_size"]
+    #batch_number = config["exp_params"]["batch_number"]
+    #batch_size = config["exp_params"]["batch_size"]
 
-    # choose device
-    gpu_id = config["trainer_params"]["gpu"]
-    if gpu_id >= 0:
-        device = torch.device('cuda:{}'.format(gpu_id))
-
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "Chose gpu_id '{}', but no GPU is available. If you want to use the CPU, set it to '-1'".format(gpu_id))
-    else:
-        device = torch.device('cpu')
+    gpu_id = validation_config["validation_params"]["gpu"]
+    device = get_device(gpu_id)
 
     print("Device in use: {}".format(device))
 
-    # load backbone model
-    backbone = backbone_models[config['exp_params']['backbone']]()
-    backbone.to(device)
-    number_of_patches = backbone.num_patches
+    padim = PaDiM(params=config["exp_params"], device=device)
+    padim.load_state_dict(torch.load(os.path.join(args.experiment_dir, "padim.pt")))
 
-    # load test data
+    # Important to set the model to eval mode, so that in the forward pass of the model the score maps are calculated
+    padim.eval()
+
+    crop_size = validation_config["exp_params"]["crop_size"]
+    batch_count = validation_config["exp_params"]["batch_count"]
+    batch_size = validation_config["exp_params"]["batch_size"]
+
     transform = transforms_for_pretrained(crop_size=crop_size)
-    normal_data_dataloader = iter(get_dataloader(config['exp_params'], train_split=False, abnormal_data=False,
-                                            transform=transform))
-    abnormal_data_dataloader = iter(get_dataloader(config['exp_params'], train_split=False, abnormal_data=True,
-                                            transform=transform))
+    normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False,
+                                            transform=transform)
+    abnormal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=True,
+                                              transform=transform)
 
-    gt_n_tensor = torch.zeros((batch_number, batch_size, 1))
-    gt_a_tensor = torch.ones((batch_number, batch_size, 1))
-    scores_n_tensor = torch.zeros((batch_number, batch_size, crop_size, crop_size))
-    scores_a_tensor = torch.zeros((batch_number, batch_size, crop_size, crop_size))
-    batch_normal = torch.zeros((batch_number, batch_size, 3, crop_size, crop_size))
-    batch_abnormal = torch.zeros((batch_number, batch_size, 3, crop_size, crop_size))
+    gt_n_tensor = torch.zeros((batch_count, batch_size, 1))
+    gt_a_tensor = torch.ones((batch_count, batch_size, 1))
+    scores_n_tensor = torch.zeros((batch_count, batch_size, crop_size, crop_size))
+    scores_a_tensor = torch.zeros((batch_count, batch_size, crop_size, crop_size))
+    batch_normal = torch.zeros((batch_count, batch_size, 3, crop_size, crop_size))
+    batch_abnormal = torch.zeros((batch_count, batch_size, 3, crop_size, crop_size))
     # calculate score map
-    for i in tqdm(range(batch_number)):
+    for i in tqdm(range(batch_count)):
         batch_n = next(normal_data_dataloader)[0]
         batch_a = next(abnormal_data_dataloader)[0]
         batch_normal[i] = batch_n
@@ -192,9 +197,7 @@ def main():
     fig.savefig(os.path.join(image_savepath, 'roc_curve.png'), dpi=100)
     print("Saved ROC  images to {}".format(image_savepath))
 
-
-
-    for i in tqdm(range(batch_number)):
+    for i in tqdm(range(batch_count)):
         scores_n = scores_n_tensor[i]
         gt_n = gt_n_tensor[i]
         batch_n = batch_normal[i]
@@ -205,5 +208,7 @@ def main():
         batch_a = batch_abnormal[i]
         save_plot_figs(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath)
     print("Saved validation images to {}".format(image_savepath))
+
+
 if __name__ == "__main__":
     main()
