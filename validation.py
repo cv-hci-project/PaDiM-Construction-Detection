@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 
 import matplotlib
 import numpy as np
@@ -101,9 +102,6 @@ def main():
         except yaml.YAMLError as exc:
             print(exc)
 
-    image_savepath = os.path.join(args.experiment_dir, "validation")
-    os.makedirs(image_savepath, exist_ok=True)
-
     gpu_id = validation_config["trainer_params"]["gpu"]
     device = get_device(gpu_id)
 
@@ -138,23 +136,43 @@ def main():
               " validation sets.")
         raise
 
+    number_visualization_batches = validation_config["exp_params"]["number_visualization_batches"]
+
     normal_data_iterator = iter(normal_data_dataloader)
     abnormal_data_iterator = iter(abnormal_data_dataloader)
 
     gt_n_tensor = torch.zeros((batch_count, batch_size, 1))
     gt_a_tensor = torch.ones((batch_count, batch_size, 1))
-    scores_n_tensor = torch.zeros((batch_count, batch_size, crop_size, crop_size))
-    scores_a_tensor = torch.zeros((batch_count, batch_size, crop_size, crop_size))
-    batch_normal = torch.zeros((batch_count, batch_size, 3, crop_size, crop_size))
-    batch_abnormal = torch.zeros((batch_count, batch_size, 3, crop_size, crop_size))
+
+    predictions_n = []
+    predictions_a = []
+
+    scores_n_tensor = torch.zeros((number_visualization_batches, batch_size, crop_size, crop_size))
+    scores_a_tensor = torch.zeros((number_visualization_batches, batch_size, crop_size, crop_size))
+    batch_normal = torch.zeros((number_visualization_batches, batch_size, 3, crop_size, crop_size))
+    batch_abnormal = torch.zeros((number_visualization_batches, batch_size, 3, crop_size, crop_size))
     # calculate score map
     for i in tqdm(range(batch_count)):
         batch_n = next(normal_data_iterator)[0]
         batch_a = next(abnormal_data_iterator)[0]
-        batch_normal[i] = batch_n
-        batch_abnormal[i] = batch_a
-        scores_n_tensor[i] = padim(batch_n)
-        scores_a_tensor[i] = padim(batch_a)
+
+        _score_n = padim(batch_n)
+        _score_a = padim(batch_a)
+
+        predictions_n.append(_score_n.reshape(_score_n.shape[0], -1).max(axis=1)[0].cpu().numpy())
+        predictions_a.append(_score_a.reshape(_score_a.shape[0], -1).max(axis=1)[0].cpu().numpy())
+
+        if i < number_visualization_batches:
+            batch_normal[i] = batch_n
+            batch_abnormal[i] = batch_a
+
+            scores_n_tensor[i] = _score_n
+            scores_a_tensor[i] = _score_a
+
+    predictions_n = np.array(predictions_n).flatten()
+    predictions_a = np.array(predictions_a).flatten()
+
+    predictions = np.concatenate([predictions_n, predictions_a])
 
     scores_all = torch.cat([scores_n_tensor, scores_a_tensor], 0)
     bn, bz, cs1, cs2 = scores_all.shape
@@ -166,12 +184,18 @@ def main():
     v_max = scores_all.max()
     v_min = scores_all.min()
 
+    # Delete entries of the validation folder if it exists so that there is no overlap between validations
+    image_savepath = os.path.join(args.experiment_dir, "validation")
+    shutil.rmtree(image_savepath)
+
+    os.makedirs(image_savepath, exist_ok=True)
+
     # calculate metrics
-    (fig, _), best_threshold = get_roc_plot_and_threshold(scores_all, gt_all)
+    (fig, _), best_threshold = get_roc_plot_and_threshold(predictions=predictions, gt_list=gt_all)
     fig.savefig(os.path.join(image_savepath, 'roc_curve.png'), dpi=100)
     print("Saved ROC to {}".format(image_savepath))
 
-    for i in tqdm(range(batch_count)):
+    for i in tqdm(range(number_visualization_batches)):
         scores_n = scores_n_tensor[i]
         gt_n = gt_n_tensor[i]
         batch_n = batch_normal[i]

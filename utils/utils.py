@@ -11,13 +11,14 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve
 
 
-def get_roc_plot_and_threshold(scores, gt_list):
+def get_roc_plot_and_threshold(predictions, gt_list):
     # calculate image-level ROC AUC score
-    img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+    # img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+    predictions = np.asarray(predictions)
     gt_list = np.asarray(gt_list)
 
-    fpr, tpr, thresholds = roc_curve(gt_list, img_scores[0])
-    img_roc_auc = roc_auc_score(gt_list, img_scores[0])
+    fpr, tpr, thresholds = roc_curve(gt_list, predictions)
+    img_roc_auc = roc_auc_score(gt_list, predictions)
 
     fig, ax = plt.subplots(1, 1)
     fig_img_rocauc = ax
@@ -28,7 +29,7 @@ def get_roc_plot_and_threshold(scores, gt_list):
     ax.set_title('Receiver operating characteristic')
     ax.legend(loc="lower right")
 
-    precision, recall, thresholds = precision_recall_curve(gt_list, img_scores[0])
+    precision, recall, thresholds = precision_recall_curve(gt_list, predictions)
     a = 2 * precision * recall
     b = precision + recall
     f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)

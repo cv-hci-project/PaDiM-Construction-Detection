@@ -1,6 +1,7 @@
 exp_params:
-  batch_size: 10
-  batch_count: 10
+  batch_size: 32
+  # batch_count: 2 # Comment out to use the full validation sets
+  number_visualization_batches: 2
   crop_size: 224
 
 trainer_params:
