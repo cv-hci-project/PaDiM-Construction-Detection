@@ -179,7 +179,7 @@ def main():
     scores_all = scores_all.reshape(bn * bz, cs1, cs2)
 
     gt_all = torch.cat([gt_n_tensor, gt_a_tensor], 0)
-    gt_all = gt_all.reshape(bn * bz, 1)
+    gt_all = gt_all.reshape(-1, 1)
 
     v_max = scores_all.max()
     v_min = scores_all.min()
