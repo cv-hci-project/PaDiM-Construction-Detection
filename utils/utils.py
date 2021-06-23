@@ -85,11 +85,11 @@ def get_embedding(features_1, features_2, features_3, embedding_ids, device):
 def _calculate_dist_list(embedding, embedding_dimensions: tuple, means, covs):
     B, C, H, W = embedding_dimensions
 
-    # TODO the batched results are a little bit different to the sequential ones, maybe this is due to some rounding
-    #  errors but it could also be a miscalculation in the batched method, needs to be validated
+    # TODO seems like batched dist list works now, but maybe needs more validation
     # batched_dist_list = _calculate_dist_list_batched(embedding, embedding_dimensions, means, covs)
 
     dist_list = []
+
     for i in range(H * W):
         mean = means[i, :]
         conv_inv = np.linalg.inv(covs[i, :, :])
@@ -109,9 +109,9 @@ def _calculate_dist_list_batched(embedding, embedding_dimensions: tuple, means, 
 
     delta = embedding.numpy().transpose((0, 2, 1)) - np.expand_dims(_means, axis=0)
 
-    dist_list = np.sqrt(np.einsum('bij,ijj,bij->bi', delta, _inverse_covariances, delta))
+    batched_result = np.sqrt(np.einsum('bij,ijk,bik->bi', delta, _inverse_covariances, delta))
 
-    return dist_list.reshape((b, h, w))
+    return batched_result.reshape((b, h, w))
 
 
 def calculate_score_map(embedding, embedding_dimensions: tuple, means, covs, crop_size, min_max_norm: bool):
