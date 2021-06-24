@@ -3,8 +3,6 @@ import torch
 import torch.nn.functional as F
 from torchvision import transforms
 from matplotlib import pyplot as plt
-from scipy.spatial.distance import mahalanobis
-from scipy.ndimage import gaussian_filter
 from skimage import morphology
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
@@ -80,61 +78,6 @@ def get_embedding(features_1, features_2, features_3, embedding_ids, device):
     embedding = torch.index_select(embedding, dim=1, index=embedding_ids)
 
     return embedding
-
-
-def _calculate_dist_list(embedding, embedding_dimensions: tuple, means, covs):
-    B, C, H, W = embedding_dimensions
-
-    # TODO seems like batched dist list works now, but maybe needs more validation
-    # batched_dist_list = _calculate_dist_list_batched(embedding, embedding_dimensions, means, covs)
-
-    dist_list = []
-
-    for i in range(H * W):
-        mean = means[i, :]
-        conv_inv = np.linalg.inv(covs[i, :, :])
-        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding]
-        dist_list.append(dist)
-
-    dist_list = np.array(dist_list).transpose((1, 0)).reshape((B, H, W))
-
-    return dist_list
-
-
-def _calculate_dist_list_batched(embedding, embedding_dimensions: tuple, means, covs):
-    b, c, h, w = embedding_dimensions
-
-    _means = means.numpy()
-    _inverse_covariances = np.linalg.inv(covs.numpy())
-
-    delta = embedding.numpy().transpose((0, 2, 1)) - np.expand_dims(_means, axis=0)
-
-    batched_result = np.sqrt(np.einsum('bij,ijk,bik->bi', delta, _inverse_covariances, delta))
-
-    return batched_result.reshape((b, h, w))
-
-
-def calculate_score_map(embedding, embedding_dimensions: tuple, means, covs, crop_size, min_max_norm: bool):
-    dist_list = _calculate_dist_list(embedding, embedding_dimensions, means, covs)
-
-    # Upsample
-    dist_list = torch.tensor(dist_list)
-    score_map = F.interpolate(dist_list.unsqueeze(1), size=crop_size, mode='bilinear',
-                              align_corners=False).squeeze().numpy()
-
-    # Apply gaussian smoothing on the score map
-    for i in range(score_map.shape[0]):
-        score_map[i] = gaussian_filter(score_map[i], sigma=4)
-
-    # Normalization
-    if min_max_norm:
-        max_score = score_map.max()
-        min_score = score_map.min()
-        scores = (score_map - min_score) / (max_score - min_score)
-    else:
-        scores = score_map
-
-    return scores
 
 
 def create_mask(img_score: np.ndarray, threshold):

@@ -1,8 +1,11 @@
+from scipy.ndimage import gaussian_filter
+
 import torch
 from torch.nn import Module, Parameter
+import torch.nn.functional as F
 
 from backbones import backbone_models
-from utils.utils import get_embedding, calculate_score_map
+from utils.utils import get_embedding
 
 
 class PaDiM(Module):
@@ -47,6 +50,11 @@ class PaDiM(Module):
             requires_grad=False
         )
 
+        self.learned_inverse_covariances = Parameter(
+            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings)).to(self.device),
+            requires_grad=False
+        )
+
         self.crop_size = params["crop_size"]
 
     def calculate_means_and_covariances(self):
@@ -64,10 +72,26 @@ class PaDiM(Module):
             self.learned_covariances[i, :, :] /= self.n - 1  # corrected covariance
             self.learned_covariances[i, :, :] += epsilon * identity  # constant term
 
+        self.learned_inverse_covariances = Parameter(torch.linalg.inv(self.learned_covariances), requires_grad=False)
+
         # TODO we could delete self.means and self.covariances as they are not needed anymore (they are only running
         #  variables to track the batches)
 
-    def forward(self, x):
+    # def _batched_calculation(self, embeddings: torch.Tensor):
+    #
+    #     results = []
+    #
+    #     for i in range(self.number_of_patches):
+    #         patch_embeddings = embeddings[:, :, i]
+    #
+    #         results.append(torch.einsum(''))
+    #
+    #
+    #     result = torch.bmm(embeddings, embeddings)
+    #
+    #     return result
+
+    def forward(self, x, min_max_norm: bool = True):
         x = x.to(self.device)
 
         with torch.no_grad():
@@ -79,6 +103,9 @@ class PaDiM(Module):
         embeddings = embeddings.view(-1, self.number_of_embeddings, self.number_of_patches)
 
         if self.training:
+
+            # batched_result = self._batched_calculation(embeddings)
+
             for i in range(self.number_of_patches):
                 patch_embeddings = embeddings[:, :, i]  # b * c
                 for j in range(b):
@@ -88,7 +115,37 @@ class PaDiM(Module):
                 self.means[i, :] += patch_embeddings.sum(dim=0)  # c
             self.n += b  # number of images
         else:
-            # TODO calculate distance map here
-            scores = calculate_score_map(embeddings, (b, c, h, w), self.learned_means,
-                                         self.learned_covariances, self.crop_size, min_max_norm=True)
-            return torch.Tensor(scores)
+            return self.calculate_score_map(embeddings, (b, c, h, w), min_max_norm=min_max_norm)
+
+    def _calculate_dist_list(self, embedding, embedding_dimensions: tuple):
+        b, c, h, w = embedding_dimensions
+
+        delta = embedding.transpose(2, 1) - self.learned_means.unsqueeze(0)
+
+        # Calculates the mahalanobis distance in a batched manner
+        batched_tensor_result = torch.sqrt(
+            torch.einsum('bij,ijk,bik->bi', delta, self.learned_inverse_covariances, delta)
+        )
+
+        return batched_tensor_result.view((b, h, w))
+
+    def calculate_score_map(self, embedding, embedding_dimensions: tuple, min_max_norm: bool) -> torch.Tensor:
+        dist_list = self._calculate_dist_list(embedding, embedding_dimensions)
+
+        # Upsample
+        score_map = F.interpolate(dist_list.unsqueeze(1), size=self.crop_size, mode='bilinear',
+                                  align_corners=False).squeeze().numpy()
+
+        # Apply gaussian smoothing on the score map
+        for i in range(score_map.shape[0]):
+            score_map[i] = gaussian_filter(score_map[i], sigma=4)
+
+        # Normalization
+        if min_max_norm:
+            max_score = score_map.max()
+            min_score = score_map.min()
+            scores = (score_map - min_score) / (max_score - min_score)
+        else:
+            scores = score_map
+
+        return torch.Tensor(scores).to(self.device)
