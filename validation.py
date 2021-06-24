@@ -9,11 +9,28 @@ import yaml
 from matplotlib import pyplot as plt
 from skimage.segmentation import mark_boundaries
 from tqdm import tqdm
+import torchvision.utils as vutils
 
 from models import PaDiM
 from utils.dataloader_utils import get_dataloader, get_device
 from utils.utils import (transforms_for_pretrained, get_roc_plot_and_threshold, denormalization_for_pretrained,
                          create_mask)
+
+def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path):
+    figures = []
+    num = len(scores)
+    # vmax = scores.max() * 255.
+    # vmin = scores.min() * 255.
+    vmax = v_max
+    vmin = v_min
+    for i in range(num):
+        classified_as = scores[i].max() > threshold
+
+        fig_img, ax_img = create_img_subplot(batch[i], scores[i], threshold=threshold, vmin=vmin,
+                                             vmax=vmax)
+        name = "Validation_{}_Image_Classified_as_{}_{}.png".format(int(label[i]), classified_as, i + batch_id * num)
+        fig_img.savefig(os.path.join(path, name), dpi=100)
+
 
 
 def create_img_subplot(img, img_score, threshold, vmin, vmax):
@@ -59,21 +76,78 @@ def create_img_subplot(img, img_score, threshold, vmin, vmax):
 
     return fig_img, ax_img
 
-
-def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path):
+def save_grid_plot(batch, batch_id, label, scores, threshold, v_max, v_min, path):
     figures = []
     num = len(scores)
     # vmax = scores.max() * 255.
     # vmin = scores.min() * 255.
     vmax = v_max
     vmin = v_min
-    for i in range(num):
-        classified_as = scores[i].max() > threshold
 
-        fig_img, ax_img = create_img_subplot(batch[i], scores[i], threshold=threshold, vmin=vmin,
-                                             vmax=vmax)
-        name = "Validation_{}_Image_Classified_as_{}_{}.png".format(int(label[i]), classified_as, i + batch_id * num)
-        fig_img.savefig(os.path.join(path, name), dpi=100)
+    # TODO: separate in predicted positive/negative rather than GT positive/negative?
+    classified_as = scores.max() > threshold
+
+    img_plot, _ = create_grid_plot(batch, scores, threshold=threshold, vmin=vmin, vmax=vmax)
+    img_plot.set_size_inches(20, 12)
+    img_plot.savefig(os.path.join(path, "Validation_Batch_{}_{}".format(batch_id, "Positive" if label[0] == True else "Negative")), dpi=100)
+
+def create_grid_plot(imgs, img_scores, threshold, vmin, vmax):
+    original = [None] * imgs.shape[0]
+    heat_maps = [None] * imgs.shape[0]
+    masks = [None] * imgs.shape[0]
+    vis_imgs = [None] * imgs.shape[0]
+
+    for i in range(imgs.shape[0]):
+        original[i] = denormalization_for_pretrained(imgs[i].cpu().numpy())
+        heat_maps[i] = np.copy(img_scores[i])
+        masks[i] = create_mask(img_scores[i], threshold)
+        vis_imgs[i] = mark_boundaries(original[i], masks[i], color=(1, 0, 0), mode='thick')
+
+    # Transform to tensor and prepare for plotting: BxCxWxH
+    original = torch.Tensor(original).permute(0, 3, 1, 2)
+    heat_maps = torch.Tensor(heat_maps).unsqueeze(1)
+    masks = torch.Tensor(masks).unsqueeze(1)
+    vis_imgs = torch.Tensor(vis_imgs).permute(0, 3, 1, 2)
+
+    fig, ((ax11, ax12), (ax21, ax22)) = plt.subplots(nrows=2, ncols=2)
+    for ax_i in (ax11, ax12, ax21, ax22):
+        ax_i.axes.xaxis.set_visible(False)
+        ax_i.axes.yaxis.set_visible(False)
+
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    ax11.imshow(vutils.make_grid(original, normalize=True, nrow=8).permute(1,2,0).numpy())
+    ax11.set_title("Original")
+
+    # TODO: fix heat maps
+    ax = ax12.imshow(vutils.make_grid(heat_maps, normalize=True, nrow=8).permute(1,2,0).numpy(), cmap='jet', norm=norm)
+    ax12.imshow(vutils.make_grid(original, normalize=True, nrow=8).permute(1,2,0).numpy(), cmap='gray', interpolation='none')
+    ax12.imshow(vutils.make_grid(heat_maps, normalize=True, nrow=8).permute(1,2,0).numpy(),
+               cmap='jet', alpha=0.5, interpolation='none')
+    ax12.set_title("Predicted heat maps")
+
+    ax21.imshow(vutils.make_grid(masks, normalize=True, nrow=8).permute(1,2,0).numpy(), cmap='gray')
+    ax21.set_title("Predicted masks")
+
+    ax22.imshow(vutils.make_grid(vis_imgs, normalize=True, nrow=8).permute(1,2,0).numpy())
+    ax22.set_title("Segmentation results")
+
+    left = 0.92
+    bottom = 0.15
+    width = 0.015
+    height = 1 - 2 * bottom
+    rect = [left, bottom, width, height]
+    cbar_ax = fig.add_axes(rect)
+    cb = plt.colorbar(ax, shrink=0.6, cax=cbar_ax, fraction=0.046)
+    cb.ax.tick_params(labelsize=8)
+    font = {
+        'family': 'serif',
+        'color': 'black',
+        'weight': 'normal',
+        'size': 12,
+    }
+    cb.set_label('Anomaly Score', fontdict=font)
+
+    return fig, (ax11, ax12, ax21, ax22)
 
 
 def main():
@@ -187,7 +261,6 @@ def main():
     # Delete entries of the validation folder if it exists so that there is no overlap between validations
     image_savepath = os.path.join(args.experiment_dir, "validation")
     shutil.rmtree(image_savepath)
-
     os.makedirs(image_savepath, exist_ok=True)
 
     # calculate metrics
@@ -199,12 +272,12 @@ def main():
         scores_n = scores_n_tensor[i]
         gt_n = gt_n_tensor[i]
         batch_n = batch_normal[i]
-        save_plot_figs(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath)
+        save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath)
 
         scores_a = scores_a_tensor[i]
         gt_a = gt_a_tensor[i]
         batch_a = batch_abnormal[i]
-        save_plot_figs(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath)
+        save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath)
     print("Saved validation images to {}".format(image_savepath))
 
 
