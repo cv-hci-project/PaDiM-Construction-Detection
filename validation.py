@@ -258,9 +258,15 @@ def main():
     v_max = scores_all.max()
     v_min = scores_all.min()
 
-    # Delete entries of the validation folder if it exists so that there is no overlap between validations
     image_savepath = os.path.join(args.experiment_dir, "validation")
-    shutil.rmtree(image_savepath)
+
+    # Delete entries of the validation folder if it exists so that there is no overlap between validations
+    try:
+        shutil.rmtree(image_savepath)
+    except FileNotFoundError:
+        # Already deleted, pass
+        pass
+
     os.makedirs(image_savepath, exist_ok=True)
 
     # calculate metrics
