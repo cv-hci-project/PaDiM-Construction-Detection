@@ -77,20 +77,6 @@ class PaDiM(Module):
         # TODO we could delete self.means and self.covariances as they are not needed anymore (they are only running
         #  variables to track the batches)
 
-    # def _batched_calculation(self, embeddings: torch.Tensor):
-    #
-    #     results = []
-    #
-    #     for i in range(self.number_of_patches):
-    #         patch_embeddings = embeddings[:, :, i]
-    #
-    #         results.append(torch.einsum(''))
-    #
-    #
-    #     result = torch.bmm(embeddings, embeddings)
-    #
-    #     return result
-
     def forward(self, x, min_max_norm: bool = True):
         x = x.to(self.device)
 
@@ -104,8 +90,6 @@ class PaDiM(Module):
 
         if self.training:
 
-            # batched_result = self._batched_calculation(embeddings)
-
             for i in range(self.number_of_patches):
                 patch_embeddings = embeddings[:, :, i]  # b * c
                 for j in range(b):
@@ -116,6 +100,17 @@ class PaDiM(Module):
             self.n += b  # number of images
         else:
             return self.calculate_score_map(embeddings, (b, c, h, w), min_max_norm=min_max_norm)
+
+    # def _test_batched_version(self, embeddings, embedding_dimensions: tuple):
+    #     b, c, h, w = embedding_dimensions
+    #
+    #     for i in range(self.number_of_patches):
+    #         patch_embeddings = embeddings[:, :, i]  # b * c
+    #
+    #         self.second_covariances[i, :, :] = torch.einsum('bi,bj->bij', patch_embeddings, patch_embeddings).sum(dim=0)
+    #         self.second_means[i, :] += patch_embeddings.sum(dim=0)  # c
+    #
+    #     self.n2 += b  # number of images
 
     def _calculate_dist_list(self, embedding, embedding_dimensions: tuple):
         b, c, h, w = embedding_dimensions
