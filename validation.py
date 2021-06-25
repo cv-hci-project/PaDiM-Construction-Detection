@@ -29,7 +29,11 @@ def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path
         fig_img, ax_img = create_img_subplot(batch[i], scores[i], threshold=threshold, vmin=vmin,
                                              vmax=vmax)
         name = "Validation_{}_Image_Classified_as_{}_{}.png".format(int(label[i]), classified_as, i + batch_id * num)
-        fig_img.savefig(os.path.join(path, name), dpi=100)
+        save_path = os.path.join(path, 'Classified_as_{}'.format(classified_as))
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        fig_img.savefig(os.path.join(save_path, name), dpi=100)
 
 
 
