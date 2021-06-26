@@ -1,49 +1,41 @@
-from scipy.ndimage import gaussian_filter
-
 import torch
-from torch.nn import Module, Parameter
 import torch.nn.functional as F
+from scipy.ndimage import gaussian_filter
+from torch.nn import Parameter
 
 from models import PaDiMBase
-from backbones import backbone_models
 from utils.utils import get_embedding
 
 
-class PaDiM(PaDiMBase):
+class PaDiMShared(PaDiMBase):
 
     def __init__(self, params: dict, device):
         super().__init__(params, device)
 
         self.means = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings), device=self.device),
+            torch.zeros((self.number_of_embeddings, ), device=self.device),
             requires_grad=False
         )
 
         self.covariances = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings),
-                        device=self.device),
+            torch.zeros((self.number_of_embeddings, self.number_of_embeddings), device=self.device),
             requires_grad=False
         )
 
         self.learned_means = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings), device=self.device),
+            torch.zeros_like(self.means, device=self.device),
             requires_grad=False
         )
 
         self.learned_covariances = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings),
-                        device=self.device),
+            torch.zeros_like(self.covariances, device=self.device),
             requires_grad=False
         )
 
         self.learned_inverse_covariances = Parameter(
-            torch.zeros((self.number_of_patches, self.number_of_embeddings, self.number_of_embeddings),
-                        device=self.device),
+            torch.zeros_like(self.covariances, device=self.device),
             requires_grad=False
         )
-
-        #feature1, _, _ = self.backbone(test)
-        #self.number_of_patches = feature1.size()[2]
 
     def calculate_means_and_covariances(self):
         self.learned_means = Parameter(self.means.clone().to(self.device), requires_grad=False)
@@ -51,14 +43,12 @@ class PaDiM(PaDiMBase):
 
         epsilon = 0.01
 
-        identity = torch.eye(self.number_of_embeddings).to(self.device)
+        identity = torch.eye(self.number_of_embeddings, device=self.device)
         self.learned_means /= self.n
 
-        for i in range(self.number_of_patches):
-            self.learned_covariances[i, :, :] -= self.n * torch.outer(self.learned_means[i, :],
-                                                                      self.learned_means[i, :])
-            self.learned_covariances[i, :, :] /= self.n - 1  # corrected covariance
-            self.learned_covariances[i, :, :] += epsilon * identity  # constant term
+        self.learned_covariances -= self.n * torch.outer(self.learned_means, self.learned_means)
+        self.learned_covariances /= self.n - 1  # corrected covariance
+        self.learned_covariances += epsilon * identity
 
         self.learned_inverse_covariances = Parameter(torch.linalg.inv(self.learned_covariances), requires_grad=False)
 
@@ -74,31 +64,18 @@ class PaDiM(PaDiMBase):
         embeddings = get_embedding(features_1, features_2, features_3, self.embedding_ids, self.device)
         b, c, h, w = embeddings.size()
 
-        embeddings = embeddings.view(-1, self.number_of_embeddings, self.number_of_patches)
+        patches = embeddings.permute((0, 2, 3, 1)).reshape((-1, c))
 
         if self.training:
-
-            for i in range(self.number_of_patches):
-                patch_embeddings = embeddings[:, :, i]  # b * c
-                for j in range(b):
-                    self.covariances[i, :, :] += torch.outer(
-                        patch_embeddings[j, :],
-                        patch_embeddings[j, :])  # c * c
-                self.means[i, :] += patch_embeddings.sum(dim=0)  # c
-            self.n += b  # number of images
+            n_patches = patches.size(0)
+            for i in range(n_patches):
+                patch = patches[i]
+                self.covariances += torch.outer(patch, patch)  # c * c
+            self.means += patches.sum(dim=0)
+            self.n += n_patches
         else:
+            # embeddings = embeddings.view(-1, self.number_of_embeddings, self.number_of_patches)
             return self.calculate_score_map(embeddings, (b, c, h, w), min_max_norm=min_max_norm)
-
-    # def _test_batched_version(self, embeddings, embedding_dimensions: tuple):
-    #     b, c, h, w = embedding_dimensions
-    #
-    #     for i in range(self.number_of_patches):
-    #         patch_embeddings = embeddings[:, :, i]  # b * c
-    #
-    #         self.second_covariances[i, :, :] = torch.einsum('bi,bj->bij', patch_embeddings, patch_embeddings).sum(dim=0)
-    #         self.second_means[i, :] += patch_embeddings.sum(dim=0)  # c
-    #
-    #     self.n2 += b  # number of images
 
     def _calculate_dist_list(self, embedding, embedding_dimensions: tuple):
         b, c, h, w = embedding_dimensions

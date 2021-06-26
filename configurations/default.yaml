@@ -8,6 +8,7 @@ exp_params:
   crop_size: 224
   backbone: "resnet18"
   number_of_embeddings: 100
+  padim_mode: "shared"
   dataloader_workers: 4
 
 trainer_params:
