@@ -64,9 +64,9 @@ class PaDiMShared(PaDiMBase):
         embeddings = get_embedding(features_1, features_2, features_3, self.embedding_ids, self.device)
         b, c, h, w = embeddings.size()
 
-        patches = embeddings.permute((0, 2, 3, 1)).reshape((-1, c))
-
         if self.training:
+            patches = embeddings.permute((0, 2, 3, 1)).reshape((-1, c))
+
             n_patches = patches.size(0)
             for i in range(n_patches):
                 patch = patches[i]
@@ -80,14 +80,18 @@ class PaDiMShared(PaDiMBase):
     def _calculate_dist_list(self, embedding, embedding_dimensions: tuple):
         b, c, h, w = embedding_dimensions
 
-        delta = embedding.transpose(2, 1) - self.learned_means.unsqueeze(0)
+        dist_list = torch.zeros((b, h, w), device=self.device)
 
-        # Calculates the mahalanobis distance in a batched manner
-        batched_tensor_result = torch.sqrt(
-            torch.einsum('bij,ijk,bik->bi', delta, self.learned_inverse_covariances, delta)
-        )
+        patches = embedding.reshape(b, c, w * h)
 
-        return batched_tensor_result.view((b, h, w))
+        for i in range(b):
+            current_patch = patches[i].permute(1, 0)
+
+            delta = current_patch - self.learned_means
+            temp = torch.matmul(self.learned_inverse_covariances, delta.unsqueeze(-1))
+            dist_list[i] = torch.sqrt(torch.matmul(delta.unsqueeze(1), temp)).reshape(h, w)
+
+        return dist_list
 
     def calculate_score_map(self, embedding, embedding_dimensions: tuple, min_max_norm: bool) -> torch.Tensor:
         dist_list = self._calculate_dist_list(embedding, embedding_dimensions)

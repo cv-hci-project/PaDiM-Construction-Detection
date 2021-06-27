@@ -11,7 +11,7 @@ from skimage.segmentation import mark_boundaries
 from tqdm import tqdm
 import torchvision.utils as vutils
 
-from models import PaDiM
+from models import registered_padim_models
 from utils.dataloader_utils import get_dataloader, get_device
 from utils.utils import (transforms_for_pretrained, get_roc_plot_and_threshold, denormalization_for_pretrained,
                          create_mask)
@@ -185,7 +185,7 @@ def main():
 
     print("Device in use: {}".format(device))
 
-    padim = PaDiM(params=config["exp_params"], device=device)
+    padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"], device=device)
     padim.load_state_dict(torch.load(os.path.join(args.experiment_dir, "padim.pt"), map_location=device))
 
     # Important to set the model to eval mode, so that in the forward pass of the model the score maps are calculated

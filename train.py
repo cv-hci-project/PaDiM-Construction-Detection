@@ -8,7 +8,7 @@ import yaml
 from test_tube import Experiment
 from tqdm import tqdm
 
-from models import PaDiM
+from models import PaDiM, registered_padim_models
 from utils.dataloader_utils import get_dataloader, get_device
 from utils.utils import transforms_for_pretrained
 
@@ -53,7 +53,7 @@ def main():
 
     print("Device in use: {}".format(device))
 
-    padim = PaDiM(params=config["exp_params"], device=device)
+    padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"], device=device)
 
     transform = transforms_for_pretrained(crop_size=config["exp_params"]["crop_size"])
 
