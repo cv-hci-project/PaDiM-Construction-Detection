@@ -1,6 +1,4 @@
 import torch
-import torch.nn.functional as F
-from scipy.ndimage import gaussian_filter
 from torch.nn import Parameter
 
 from models import PaDiMBase
@@ -13,7 +11,7 @@ class PaDiMShared(PaDiMBase):
         super().__init__(params, device)
 
         self.means = Parameter(
-            torch.zeros((self.number_of_embeddings, ), device=self.device),
+            torch.zeros((self.number_of_embeddings,), device=self.device),
             requires_grad=False
         )
 
@@ -92,24 +90,3 @@ class PaDiMShared(PaDiMBase):
             dist_list[i] = torch.sqrt(torch.matmul(delta.unsqueeze(1), temp)).reshape(h, w)
 
         return dist_list
-
-    def calculate_score_map(self, embedding, embedding_dimensions: tuple, min_max_norm: bool) -> torch.Tensor:
-        dist_list = self._calculate_dist_list(embedding, embedding_dimensions)
-
-        # Upsample
-        score_map = F.interpolate(dist_list.unsqueeze(1), size=self.crop_size, mode='bilinear',
-                                  align_corners=False).squeeze().numpy()
-
-        # Apply gaussian smoothing on the score map
-        for i in range(score_map.shape[0]):
-            score_map[i] = gaussian_filter(score_map[i], sigma=4)
-
-        # Normalization
-        if min_max_norm:
-            max_score = score_map.max()
-            min_score = score_map.min()
-            scores = (score_map - min_score) / (max_score - min_score)
-        else:
-            scores = score_map
-
-        return torch.Tensor(scores).to(self.device)

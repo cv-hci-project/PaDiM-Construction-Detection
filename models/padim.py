@@ -1,11 +1,7 @@
-from scipy.ndimage import gaussian_filter
-
 import torch
-from torch.nn import Module, Parameter
-import torch.nn.functional as F
+from torch.nn import Parameter
 
 from models import PaDiMBase
-from backbones import backbone_models
 from utils.utils import get_embedding
 
 
@@ -42,8 +38,8 @@ class PaDiM(PaDiMBase):
             requires_grad=False
         )
 
-        #feature1, _, _ = self.backbone(test)
-        #self.number_of_patches = feature1.size()[2]
+        # feature1, _, _ = self.backbone(test)
+        # self.number_of_patches = feature1.size()[2]
 
     def calculate_means_and_covariances(self):
         self.learned_means = Parameter(self.means.clone().to(self.device), requires_grad=False)
@@ -111,24 +107,3 @@ class PaDiM(PaDiMBase):
         )
 
         return batched_tensor_result.view((b, h, w))
-
-    def calculate_score_map(self, embedding, embedding_dimensions: tuple, min_max_norm: bool) -> torch.Tensor:
-        dist_list = self._calculate_dist_list(embedding, embedding_dimensions)
-
-        # Upsample
-        score_map = F.interpolate(dist_list.unsqueeze(1), size=self.crop_size, mode='bilinear',
-                                  align_corners=False).squeeze().numpy()
-
-        # Apply gaussian smoothing on the score map
-        for i in range(score_map.shape[0]):
-            score_map[i] = gaussian_filter(score_map[i], sigma=4)
-
-        # Normalization
-        if min_max_norm:
-            max_score = score_map.max()
-            min_score = score_map.min()
-            scores = (score_map - min_score) / (max_score - min_score)
-        else:
-            scores = score_map
-
-        return torch.Tensor(scores).to(self.device)
