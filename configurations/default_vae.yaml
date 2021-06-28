@@ -1,0 +1,28 @@
+exp_params:
+  dataset: concrete-cracks
+  data_path: "/cvhci/data/construction/Concrete-Cracks"
+  # dataset: SDNET2018
+  # data_path: "/cvhci/data/construction/SDNET2018"
+  batch_size: 32
+  # batch_count: 50 # Uncomment to set a max amount of batches
+  crop_size: 224
+  backbone: "resnet18"
+  number_of_embeddings: 100
+  padim_mode: "vanilla"
+  dataloader_workers: 4
+
+backbone_params:
+  backbone: "vanilla_vae"
+  pretrained_file_path: "/cvhci/temp/p21g3/PyTorch-VAE/logs/" # Insert a path to a .ckpt file here
+  in_channels: 3
+  latent_dim: 128
+  hidden_dims: [32, 64, 128, 256, 256, 512]
+
+trainer_params:
+  gpu: -1
+  max_epochs: 1 # One epoch is enough because PaDiM needs to see each training sample only once
+
+logging_params:
+  save_dir: "/cvhci/temp/p21g3/PyTorch-VAE/logs/"
+  name: "PaDiM-ResNet18"
+  manual_seed: 100

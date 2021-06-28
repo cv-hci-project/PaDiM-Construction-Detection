@@ -17,9 +17,9 @@ class PaDiMBase(Module):
 
         self.backbone = backbone_models[backbone_params["backbone"]](**backbone_params)
 
-        state_dict = torch.load(backbone_params["pretrained_file_path"], map_location=self.device)["state_dict"]
-
-        self.backbone.load_state_dict(state_dict, strict=False)
+        if backbone_params["backbone"] == "vanilla_vae":
+            state_dict = torch.load(backbone_params["pretrained_file_path"], map_location=self.device)["state_dict"]
+            self.backbone.load_state_dict(state_dict, strict=False)
 
         self.backbone.to(device)
         self.backbone.eval()
