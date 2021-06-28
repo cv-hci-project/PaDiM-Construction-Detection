@@ -7,8 +7,8 @@ from utils.utils import get_embedding
 
 class PaDiM(PaDiMBase):
 
-    def __init__(self, params: dict, device):
-        super().__init__(params, device)
+    def __init__(self, params: dict, backbone_params: dict, device):
+        super().__init__(params=params, backbone_params=backbone_params, device=device)
 
         self.means = Parameter(
             torch.zeros((self.number_of_patches, self.number_of_embeddings), device=self.device),

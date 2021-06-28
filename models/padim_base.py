@@ -8,15 +8,21 @@ from backbones import backbone_models
 
 class PaDiMBase(Module):
 
-    def __init__(self, params: dict, device):
+    def __init__(self, params: dict, backbone_params: dict,  device):
         super().__init__()
 
         self.device = device
 
         self.params = params
 
-        self.backbone = backbone_models[params["backbone"]]()
+        self.backbone = backbone_models[backbone_params["backbone"]](**backbone_params)
+
+        state_dict = torch.load(backbone_params["pretrained_file_path"], map_location=self.device)["state_dict"]
+
+        self.backbone.load_state_dict(state_dict, strict=False)
+
         self.backbone.to(device)
+        self.backbone.eval()
 
         self.number_of_patches = self.backbone.number_of_patches
         self.number_of_embeddings = params["number_of_embeddings"]

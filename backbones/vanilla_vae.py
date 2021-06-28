@@ -1,26 +1,23 @@
 from typing import List
 
-import torch
 from torch import Tensor
 from torch import nn
 
 
 class VanillaVAE(nn.Module):
 
-    embeddings_size = 448
-    number_of_patches = 56 * 56  # For a crop_size of 224
+    embeddings_size = 224
+    number_of_patches = 112 * 112
 
     def __init__(self,
-                 pretrained_file_path: str,
                  in_channels: int,
                  latent_dim: int,
                  hidden_dims: List,
-                 device: torch.device) -> None:
+                 **kwargs):
         super().__init__()
         # super().__init__(params)
 
         self.latent_dim = latent_dim
-        self.device = device
 
         modules = []
         if hidden_dims is None:
@@ -79,10 +76,6 @@ class VanillaVAE(nn.Module):
             nn.Conv2d(hidden_dims[-1], out_channels=3,
                       kernel_size=3, padding=1),
             nn.Tanh())
-
-        self.eval()
-
-        self.load_state_dict(torch.load(pretrained_file_path, map_location=self.device))
 
     def forward(self, x: Tensor):
 

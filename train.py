@@ -53,7 +53,9 @@ def main():
 
     print("Device in use: {}".format(device))
 
-    padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"], device=device)
+    padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"],
+                                                                        backbone_params=config["backbone_params"],
+                                                                        device=device)
 
     transform = transforms_for_pretrained(crop_size=config["exp_params"]["crop_size"])
 
