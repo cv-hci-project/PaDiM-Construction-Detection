@@ -185,7 +185,9 @@ def main():
 
     print("Device in use: {}".format(device))
 
-    padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"], device=device)
+    padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"],
+                                                                        backbone_params=config["backbone_params"],
+                                                                        device=device)
     padim.load_state_dict(torch.load(os.path.join(args.experiment_dir, "padim.pt"), map_location=device))
 
     # Important to set the model to eval mode, so that in the forward pass of the model the score maps are calculated
