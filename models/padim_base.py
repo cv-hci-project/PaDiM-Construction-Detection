@@ -60,7 +60,7 @@ class PaDiMBase(Module):
 
         # Upsample
         score_map = F.interpolate(dist_list.unsqueeze(1), size=self.crop_size, mode='bilinear',
-                                  align_corners=False).squeeze().numpy()
+                                  align_corners=False).squeeze().cpu().numpy()
 
         # Apply gaussian smoothing on the score map
         for i in range(score_map.shape[0]):
