@@ -32,7 +32,8 @@ class PaDiMBase(Module):
         normal_data_dataloader = get_dataloader(params, train_split=True, abnormal_data=False, shuffle=True,
                                                 transform=transform)
 
-        feature_1, feature_2, feature_3 = self.backbone(next(iter(normal_data_dataloader))[0])
+        test_batch = next(iter(normal_data_dataloader))[0].to(device)
+        feature_1, feature_2, feature_3 = self.backbone(test_batch)
 
         self.number_of_patches = feature_1.size(2) * feature_1.size(3)
         embeddings_size = feature_1.size(1) + feature_2.size(1) + feature_3.size(1)
