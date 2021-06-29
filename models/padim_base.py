@@ -74,4 +74,4 @@ class PaDiMBase(Module):
         else:
             scores = score_map
 
-        return torch.Tensor(scores, device=self.device)
+        return torch.tensor(scores, device=self.device)
