@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torchvision import transforms
 from matplotlib import pyplot as plt
 from skimage import morphology
 from sklearn.metrics import roc_auc_score
@@ -34,24 +33,6 @@ def get_roc_plot_and_threshold(predictions, gt_list):
     best_threshold = thresholds[np.argmax(f1)]
 
     return (fig, ax), best_threshold
-
-
-def denormalization_for_pretrained(x: np.ndarray):
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
-
-    return x
-
-
-def transforms_for_pretrained(crop_size: int):
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    return transforms.Compose([transforms.CenterCrop(crop_size),
-                               transforms.ToTensor(),
-                               transforms.Normalize(mean=mean,
-                                                    std=std)])
 
 
 def _embedding_concat(x, y):

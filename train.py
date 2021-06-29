@@ -9,8 +9,8 @@ from test_tube import Experiment
 from tqdm import tqdm
 
 from models import registered_padim_models
-from utils.dataloader_utils import get_dataloader, get_device
-from utils.utils import transforms_for_pretrained
+from backbones import backbone_kinds
+from utils.dataloader_utils import get_dataloader, get_device, get_transformations
 
 
 def main():
@@ -57,7 +57,8 @@ def main():
                                                                         backbone_params=config["backbone_params"],
                                                                         device=device)
 
-    transform = transforms_for_pretrained(crop_size=config["exp_params"]["crop_size"])
+    transform = get_transformations(backbone_kind=backbone_kinds[config["exp_params"]["backbone"]],
+                                    crop_size=config["exp_params"]["crop_size"])
 
     normal_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=False, shuffle=True,
                                             transform=transform)

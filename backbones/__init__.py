@@ -7,3 +7,9 @@ backbone_models = {
     "wide_resnet50": WideResNet50,
     "vanilla_vae": VanillaVAE
 }
+
+backbone_kinds = {
+    "resnet18": "pretrained_imagenet",
+    "wide_resnet50": "pretrained_imagenet",
+    "vanilla_vae": "vae"
+}

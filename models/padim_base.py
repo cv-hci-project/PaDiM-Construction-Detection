@@ -3,9 +3,8 @@ import torch.nn.functional as F
 from scipy.ndimage import gaussian_filter
 from torch.nn import Module, Parameter
 
-from backbones import backbone_models
-from utils.dataloader_utils import get_dataloader
-from utils.utils import transforms_for_pretrained
+from backbones import backbone_models, backbone_kinds
+from utils.dataloader_utils import get_dataloader, get_transformations
 
 
 class PaDiMBase(Module):
@@ -19,15 +18,17 @@ class PaDiMBase(Module):
         self.crop_size = params["crop_size"]
 
         self.backbone = backbone_models[backbone_params["backbone"]](**backbone_params)
+        backbone_kind = backbone_kinds[backbone_params["backbone"]]
 
-        if backbone_params["backbone"] == "vanilla_vae":
+        if backbone_kind == "vae":
             state_dict = torch.load(backbone_params["pretrained_file_path"], map_location=self.device)["state_dict"]
             self.backbone.load_state_dict(state_dict, strict=False)
 
         self.backbone.to(device)
         self.backbone.eval()
 
-        transform = transforms_for_pretrained(crop_size=self.crop_size)
+        transform = get_transformations(backbone_kind=backbone_kind, crop_size=self.crop_size)
+
         normal_data_dataloader = get_dataloader(params, train_split=True, abnormal_data=False, shuffle=True,
                                                 transform=transform)
 

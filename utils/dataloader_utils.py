@@ -1,5 +1,7 @@
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from torchvision import transforms
 
 from datasets import ConcreteCracksDataset, SDNet2018
 
@@ -42,3 +44,37 @@ def get_device(gpu_id: int):
         device = torch.device('cpu')
 
     return device
+
+
+def get_transformations(backbone_kind: str, crop_size: int):
+    if backbone_kind == "pretrained_imagenet":
+        mean = [0.485, 0.456, 0.406]
+        std = [0.229, 0.224, 0.225]
+
+        transformations = transforms.Compose([transforms.CenterCrop(crop_size),
+                                              transforms.ToTensor(),
+                                              transforms.Normalize(mean=mean,
+                                                                   std=std)])
+    elif backbone_kind == "vae":
+        set_range = transforms.Lambda(lambda x: 2.0 * x - 1.0)
+
+        transformations = transforms.Compose([transforms.Resize((crop_size, crop_size)),
+                                              transforms.ToTensor(),
+                                              set_range])
+    else:
+        raise RuntimeError("Chosen backbone_kind '{}' not supported.".format(backbone_kind))
+
+    return transformations
+
+
+def denormalize_batch(backbone_kind: str, x: np.ndarray):
+    if backbone_kind == "pretrained_imagenet":
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
+    elif backbone_kind == "vae":
+        x = (x + 1.0) / 2.0
+    else:
+        raise RuntimeError("Chosen backbone_kind '{}' not supported.".format(backbone_kind))
+
+    return x

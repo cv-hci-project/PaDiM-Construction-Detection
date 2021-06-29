@@ -5,18 +5,19 @@ import shutil
 import matplotlib
 import numpy as np
 import torch
+import torchvision.utils as vutils
 import yaml
 from matplotlib import pyplot as plt
 from skimage.segmentation import mark_boundaries
 from tqdm import tqdm
-import torchvision.utils as vutils
 
+from backbones import backbone_kinds
 from models import registered_padim_models
-from utils.dataloader_utils import get_dataloader, get_device
-from utils.utils import (transforms_for_pretrained, get_roc_plot_and_threshold, denormalization_for_pretrained,
-                         create_mask)
+from utils.dataloader_utils import get_dataloader, get_device, get_transformations, denormalize_batch
+from utils.utils import get_roc_plot_and_threshold, create_mask
 
-def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path):
+
+def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path, backbone_kind):
     figures = []
     num = len(scores)
     # vmax = scores.max() * 255.
@@ -27,7 +28,7 @@ def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path
         classified_as = scores[i].max() > threshold
 
         fig_img, ax_img = create_img_subplot(batch[i], scores[i], threshold=threshold, vmin=vmin,
-                                             vmax=vmax)
+                                             vmax=vmax, backbone_kind=backbone_kind)
         name = "Validation_{}_Image_Classified_as_{}_{}.png".format(int(label[i]), classified_as, i + batch_id * num)
         save_path = os.path.join(path, 'Classified_as_{}'.format(classified_as))
         if not os.path.exists(save_path):
@@ -36,9 +37,8 @@ def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path
         fig_img.savefig(os.path.join(save_path, name), dpi=100)
 
 
-
-def create_img_subplot(img, img_score, threshold, vmin, vmax):
-    img = denormalization_for_pretrained(img.cpu().numpy())
+def create_img_subplot(img, img_score, threshold, vmin, vmax, backbone_kind):
+    img = denormalize_batch(backbone_kind=backbone_kind, x=img.cpu().numpy())
     # gt = gts[i].transpose(1, 2, 0).squeeze()
     # heat_map = scores[i] * 255
     heat_map = np.copy(img_score)
@@ -80,7 +80,8 @@ def create_img_subplot(img, img_score, threshold, vmin, vmax):
 
     return fig_img, ax_img
 
-def save_grid_plot(batch, batch_id, label, scores, threshold, v_max, v_min, path):
+
+def save_grid_plot(batch, batch_id, label, scores, threshold, v_max, v_min, path, backbone_kind):
     figures = []
     num = len(scores)
     # vmax = scores.max() * 255.
@@ -91,18 +92,19 @@ def save_grid_plot(batch, batch_id, label, scores, threshold, v_max, v_min, path
     # TODO: separate in predicted positive/negative rather than GT positive/negative?
     classified_as = scores.max() > threshold
 
-    img_plot, _ = create_grid_plot(batch, scores, threshold=threshold, vmin=vmin, vmax=vmax)
+    img_plot, _ = create_grid_plot(batch, scores, threshold=threshold, vmin=vmin, vmax=vmax, backbone_kind=backbone_kind)
     img_plot.set_size_inches(20, 12)
     img_plot.savefig(os.path.join(path, "Validation_Batch_{}_{}".format(batch_id, "Positive" if label[0] == True else "Negative")), dpi=100)
 
-def create_grid_plot(imgs, img_scores, threshold, vmin, vmax):
+
+def create_grid_plot(imgs, img_scores, threshold, vmin, vmax, backbone_kind):
     original = [None] * imgs.shape[0]
     heat_maps = [None] * imgs.shape[0]
     masks = [None] * imgs.shape[0]
     vis_imgs = [None] * imgs.shape[0]
 
     for i in range(imgs.shape[0]):
-        original[i] = denormalization_for_pretrained(imgs[i].cpu().numpy())
+        original[i] = denormalize_batch(backbone_kind=backbone_kind, x=imgs[i].cpu().numpy())
         heat_maps[i] = np.copy(img_scores[i])
         masks[i] = create_mask(img_scores[i], threshold)
         vis_imgs[i] = mark_boundaries(original[i], masks[i], color=(1, 0, 0), mode='thick')
@@ -197,8 +199,13 @@ def main():
     batch_size = validation_config["exp_params"]["batch_size"]
 
     config["exp_params"]["batch_size"] = batch_size
+    config["exp_params"]["dataloader_workers"] = 0
+    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/SDNET2018"
+    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/Concrete-Crack-Images"
 
-    transform = transforms_for_pretrained(crop_size=crop_size)
+    backbone_kind = backbone_kinds[config["exp_params"]["backbone"]]
+
+    transform = get_transformations(backbone_kind=backbone_kind, crop_size=crop_size)
     normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False,
                                             transform=transform)
     abnormal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=True,
@@ -284,12 +291,15 @@ def main():
         scores_n = scores_n_tensor[i]
         gt_n = gt_n_tensor[i]
         batch_n = batch_normal[i]
-        save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath)
+        save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath,
+                       backbone_kind=backbone_kind)
 
         scores_a = scores_a_tensor[i]
         gt_a = gt_a_tensor[i]
         batch_a = batch_abnormal[i]
-        save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath)
+        save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath,
+                       backbone_kind=backbone_kind)
+
     print("Saved validation images to {}".format(image_savepath))
 
 
