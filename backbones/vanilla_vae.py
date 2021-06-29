@@ -6,8 +6,8 @@ from torch import nn
 
 class VanillaVAE(nn.Module):
 
-    embeddings_size = 224
-    number_of_patches = 112 * 112
+    embeddings_size = 448
+    number_of_patches = 56 * 56
 
     def __init__(self,
                  in_channels: int,
@@ -79,8 +79,9 @@ class VanillaVAE(nn.Module):
 
     def forward(self, x: Tensor):
 
-        feature_1 = self.encoder[0](x)
-        feature_2 = self.encoder[1](feature_1)
-        feature_3 = self.encoder[2](feature_2)
+        x = self.encoder[0](x)
+        feature_1 = self.encoder[1](x)
+        feature_2 = self.encoder[2](feature_1)
+        feature_3 = self.encoder[3](feature_2)
 
         return feature_1, feature_2, feature_3
