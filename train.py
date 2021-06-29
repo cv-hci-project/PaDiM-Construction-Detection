@@ -8,7 +8,7 @@ import yaml
 from test_tube import Experiment
 from tqdm import tqdm
 
-from models import PaDiM, registered_padim_models
+from models import registered_padim_models
 from utils.dataloader_utils import get_dataloader, get_device
 from utils.utils import transforms_for_pretrained
 

@@ -7,9 +7,6 @@ from torchvision.models import wide_resnet50_2
 
 class WideResNet50(Module):
 
-    embeddings_size = 1792
-    number_of_patches = 56 * 56  # For a crop_size of 224
-
     def __init__(self) -> None:
         super().__init__()
         self.wide_resnet50 = wide_resnet50_2(pretrained=True)

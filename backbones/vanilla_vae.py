@@ -6,16 +6,12 @@ from torch import nn
 
 class VanillaVAE(nn.Module):
 
-    embeddings_size = 448
-    number_of_patches = 56 * 56
-
     def __init__(self,
                  in_channels: int,
                  latent_dim: int,
                  hidden_dims: List,
                  **kwargs):
         super().__init__()
-        # super().__init__(params)
 
         self.latent_dim = latent_dim
 

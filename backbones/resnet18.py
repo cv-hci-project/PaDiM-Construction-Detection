@@ -7,9 +7,6 @@ from torchvision.models import resnet18
 
 class ResNet18(Module):
 
-    embeddings_size = 448
-    number_of_patches = 56 * 56  # For a crop_size of 224
-
     def __init__(self) -> None:
         super().__init__()
         self.resnet18 = resnet18(pretrained=True)

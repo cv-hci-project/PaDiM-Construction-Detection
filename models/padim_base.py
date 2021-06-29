@@ -4,6 +4,8 @@ from scipy.ndimage import gaussian_filter
 from torch.nn import Module, Parameter
 
 from backbones import backbone_models
+from utils.dataloader_utils import get_dataloader
+from utils.utils import transforms_for_pretrained
 
 
 class PaDiMBase(Module):
@@ -14,6 +16,7 @@ class PaDiMBase(Module):
         self.device = device
 
         self.params = params
+        self.crop_size = params["crop_size"]
 
         self.backbone = backbone_models[backbone_params["backbone"]](**backbone_params)
 
@@ -24,15 +27,20 @@ class PaDiMBase(Module):
         self.backbone.to(device)
         self.backbone.eval()
 
-        self.number_of_patches = self.backbone.number_of_patches
-        self.number_of_embeddings = params["number_of_embeddings"]
+        transform = transforms_for_pretrained(crop_size=self.crop_size)
+        normal_data_dataloader = get_dataloader(params, train_split=True, abnormal_data=False, shuffle=True,
+                                                transform=transform)
 
-        self.crop_size = params["crop_size"]
+        feature_1, feature_2, feature_3 = self.backbone(next(iter(normal_data_dataloader))[0])
+
+        self.number_of_patches = feature_1.size(2) * feature_1.size(3)
+        embeddings_size = feature_1.size(1) + feature_2.size(1) + feature_3.size(1)
+        self.number_of_embeddings = params["number_of_embeddings"]
 
         self.n = 0
 
         self.embedding_ids = Parameter(
-            torch.randperm(self.backbone.embeddings_size, device=self.device)[:self.number_of_embeddings],
+            torch.randperm(embeddings_size, device=self.device)[:self.number_of_embeddings],
             requires_grad=False
         )
 
