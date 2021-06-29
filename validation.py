@@ -204,6 +204,7 @@ def main():
     # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/Concrete-Crack-Images"
 
     backbone_kind = backbone_kinds[config["exp_params"]["backbone"]]
+    min_max_normalization = validation_config["exp_params"]["min_max_normalization"]
 
     transform = get_transformations(backbone_kind=backbone_kind, crop_size=crop_size)
     normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False,
@@ -243,8 +244,8 @@ def main():
         batch_n = next(normal_data_iterator)[0]
         batch_a = next(abnormal_data_iterator)[0]
 
-        _score_n = padim(batch_n)
-        _score_a = padim(batch_a)
+        _score_n = padim(batch_n, min_max_norm=min_max_normalization)
+        _score_a = padim(batch_a, min_max_norm=min_max_normalization)
 
         predictions_n.append(_score_n.reshape(_score_n.shape[0], -1).max(axis=1)[0].cpu().numpy())
         predictions_a.append(_score_a.reshape(_score_a.shape[0], -1).max(axis=1)[0].cpu().numpy())
