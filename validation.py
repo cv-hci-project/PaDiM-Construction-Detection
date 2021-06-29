@@ -200,10 +200,12 @@ def main():
 
     config["exp_params"]["batch_size"] = batch_size
     config["exp_params"]["dataloader_workers"] = 0
+
+    # Use this to replace the data paths, for example when training on the server but validating locally
     # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/SDNET2018"
     # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/Concrete-Crack-Images"
 
-    backbone_kind = backbone_kinds[config["exp_params"]["backbone"]]
+    backbone_kind = backbone_kinds[config["backbone_params"]["backbone"]]
     min_max_normalization = validation_config["exp_params"]["min_max_normalization"]
 
     transform = get_transformations(backbone_kind=backbone_kind, crop_size=crop_size)

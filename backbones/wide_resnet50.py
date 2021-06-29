@@ -7,7 +7,7 @@ from torchvision.models import wide_resnet50_2
 
 class WideResNet50(Module):
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__()
         self.wide_resnet50 = wide_resnet50_2(pretrained=True)
         self.wide_resnet50.eval()

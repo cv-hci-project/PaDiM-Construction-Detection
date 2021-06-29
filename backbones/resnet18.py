@@ -7,7 +7,7 @@ from torchvision.models import resnet18
 
 class ResNet18(Module):
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__()
         self.resnet18 = resnet18(pretrained=True)
         self.resnet18.eval()

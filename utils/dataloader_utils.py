@@ -73,7 +73,7 @@ def denormalize_batch(backbone_kind: str, x: np.ndarray):
         std = np.array([0.229, 0.224, 0.225])
         x = (((x.transpose(1, 2, 0) * std) + mean) * 255.).astype(np.uint8)
     elif backbone_kind == "vae":
-        x = (x + 1.0) / 2.0
+        x = (x.transpose(1, 2, 0) + 1.0) / 2.0
     else:
         raise RuntimeError("Chosen backbone_kind '{}' not supported.".format(backbone_kind))
 

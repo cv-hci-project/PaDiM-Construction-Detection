@@ -57,7 +57,7 @@ def main():
                                                                         backbone_params=config["backbone_params"],
                                                                         device=device)
 
-    transform = get_transformations(backbone_kind=backbone_kinds[config["exp_params"]["backbone"]],
+    transform = get_transformations(backbone_kind=backbone_kinds[config["backbone_params"]["backbone"]],
                                     crop_size=config["exp_params"]["crop_size"])
 
     normal_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=False, shuffle=True,
