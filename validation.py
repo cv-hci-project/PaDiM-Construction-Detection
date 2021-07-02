@@ -159,6 +159,7 @@ def main():
     parser.add_argument('--load', '-l',
                         dest="experiment_dir",
                         metavar='EXP_DIR',
+                        default='logs/PaDiM-ResNet18/version_21',
                         help='Path to the experiment folder, containing a trained PaDiM model')
     parser.add_argument('--validation_config', '-vc',
                         dest="validation_config",
@@ -197,9 +198,9 @@ def main():
     config["exp_params"]["batch_size"] = batch_size
 
     transform = transforms_for_pretrained(crop_size=crop_size)
-    normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False,
+    normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False, category_data=None,
                                             transform=transform)
-    abnormal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=True,
+    abnormal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=True,category_data=None,
                                               transform=transform)
 
     try:
@@ -234,8 +235,8 @@ def main():
         batch_n = next(normal_data_iterator)[0]
         batch_a = next(abnormal_data_iterator)[0]
 
-        _score_n = padim(batch_n)
-        _score_a = padim(batch_a)
+        _score_n = padim(batch_n, None, False)
+        _score_a = padim(batch_a, None, False)
 
         predictions_n.append(_score_n.reshape(_score_n.shape[0], -1).max(axis=1)[0].cpu().numpy())
         predictions_a.append(_score_a.reshape(_score_a.shape[0], -1).max(axis=1)[0].cpu().numpy())
@@ -282,12 +283,12 @@ def main():
         scores_n = scores_n_tensor[i]
         gt_n = gt_n_tensor[i]
         batch_n = batch_normal[i]
-        save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath)
+        save_plot_figs(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath)
 
         scores_a = scores_a_tensor[i]
         gt_a = gt_a_tensor[i]
         batch_a = batch_abnormal[i]
-        save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath)
+        save_plot_figs(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath)
     print("Saved validation images to {}".format(image_savepath))
 
 
