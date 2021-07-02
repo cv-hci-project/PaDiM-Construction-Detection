@@ -13,7 +13,7 @@ class SDNet2018(Dataset):
      applications. Utah State University. https://doi.org/10.15142/T3TD19
     """
 
-    def __init__(self, root_dir, split: str = "train", abnormal_data: bool = False, transform=None):
+    def __init__(self, root_dir, split: str = "train", abnormal_data: bool = False, category_data: str = 'D', transform=None):
         """
         Args:
             root_dir (string): Directory with all the images, it assumes 'D', 'P' and 'W' as subfolders and these in
@@ -30,6 +30,7 @@ class SDNet2018(Dataset):
         self.train_split = 0.65
         self.val_split = 0.15
         self.test_split = 0.2
+        self.category_data = category_data
 
         self.possible_splits = [
             "train",
@@ -41,24 +42,35 @@ class SDNet2018(Dataset):
 
         self.split = split
         self.abnormal_data = abnormal_data
+        if self.category_data is None:
+            self.data_directories_normal = [
+                [os.path.join(self.root_dir, "D", "UD", _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, "D", "UD"))],
+                [os.path.join(self.root_dir, "P", "UP", _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, "P", "UP"))],
+                [os.path.join(self.root_dir, "W", "UW", _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, "W", "UW"))]
+            ]
 
-        self.data_directories_normal = [
-            [os.path.join(self.root_dir, "D", "UD", _dir) for _dir in
-             os.listdir(os.path.join(self.root_dir, "D", "UD"))],
-            [os.path.join(self.root_dir, "P", "UP", _dir) for _dir in
-             os.listdir(os.path.join(self.root_dir, "P", "UP"))],
-            [os.path.join(self.root_dir, "W", "UW", _dir) for _dir in
-             os.listdir(os.path.join(self.root_dir, "W", "UW"))]
-        ]
-
-        self.data_directories_abnormal = [
-            [os.path.join(self.root_dir, "D", "CD", _dir) for _dir in
-             os.listdir(os.path.join(self.root_dir, "D", "CD"))],
-            [os.path.join(self.root_dir, "P", "CP", _dir) for _dir in
-             os.listdir(os.path.join(self.root_dir, "P", "CP"))],
-            [os.path.join(self.root_dir, "W", "CW", _dir) for _dir in
-             os.listdir(os.path.join(self.root_dir, "W", "CW"))]
-        ]
+            self.data_directories_abnormal = [
+                [os.path.join(self.root_dir, "D", "CD", _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, "D", "CD"))],
+                [os.path.join(self.root_dir, "P", "CP", _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, "P", "CP"))],
+                [os.path.join(self.root_dir, "W", "CW", _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, "W", "CW"))]
+            ]
+        else:
+            self.category_data_u = 'U' + category_data
+            self.category_data_c = 'C' + category_data
+            self.data_directories_normal = [
+                [os.path.join(self.root_dir, self.category_data, self.category_data_u, _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, self.category_data, self.category_data_u))]
+            ]
+            self.data_directories_abnormal = [
+                [os.path.join(self.root_dir, self.category_data, self.category_data_c, _dir) for _dir in
+                 os.listdir(os.path.join(self.root_dir, self.category_data, self.category_data_c))]
+            ]
 
         self.train_data_normal, self.val_data_normal, self.test_data_normal = self.create_splits(
             self.data_directories_normal)
