@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from datasets import ConcreteCracksDataset, SDNet2018
 
 
-def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False, shuffle: bool = True, transform=None):
+def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False, category_data: str = 'D', shuffle: bool = True, transform=None):
     additional_dataloader_args = {'num_workers': params["dataloader_workers"], 'pin_memory': True}
 
     split = "train" if train_split else "val"
@@ -18,6 +18,7 @@ def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False,
         dataset = SDNet2018(root_dir=params['data_path'],
                             split=split,
                             abnormal_data=abnormal_data,
+                            category_data=category_data,
                             transform=transform)
     else:
         raise ValueError('Undefined dataset type')
