@@ -56,27 +56,27 @@ def main():
     padim = PaDiM(params=config["exp_params"], device=device)
 
     transform = transforms_for_pretrained(crop_size=config["exp_params"]["crop_size"])
+    for category_data in ['D', 'P', 'W']:
+        normal_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=False, category_data=category_data, shuffle=True,
+                                                transform=transform)
 
-    normal_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=False, shuffle=True,
-                                            transform=transform)
+        try:
+            batch_count = config["exp_params"]["batch_count"]
+        except KeyError:
+            batch_count = len(normal_data_dataloader)
 
-    try:
-        batch_count = config["exp_params"]["batch_count"]
-    except KeyError:
-        batch_count = len(normal_data_dataloader)
+        try:
+            assert batch_count <= len(normal_data_dataloader)
+        except AssertionError:
+            print("Chosen batch count '{}' is larger than there are available batches for the".format(batch_count) +
+                  " validation set.")
+            raise
 
-    try:
-        assert batch_count <= len(normal_data_dataloader)
-    except AssertionError:
-        print("Chosen batch count '{}' is larger than there are available batches for the".format(batch_count) +
-              " validation set.")
-        raise
+        normal_data_iterator = iter(normal_data_dataloader)
 
-    normal_data_iterator = iter(normal_data_dataloader)
-
-    for _ in tqdm(range(batch_count)):
-        batch, _ = next(normal_data_iterator)
-        padim(batch)
+        for _ in tqdm(range(batch_count)):
+            batch, _ = next(normal_data_iterator)
+            padim(batch, category_data)
 
     padim.calculate_means_and_covariances()
 
