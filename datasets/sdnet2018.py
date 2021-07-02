@@ -142,3 +142,7 @@ class SDNet2018(Dataset):
             img = self.transform(img)
 
         return img, label
+
+
+class SDNet2018CleanedThreshold(SDNet2018):
+    pass
