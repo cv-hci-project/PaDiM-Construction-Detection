@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from datasets import ConcreteCracksDataset, SDNet2018, SDNet2018CleanedThreshold
+from datasets import ConcreteCracksDataset, SDNet2018, SDNet2018CleanedThreshold, SDNet2018CleanedThresholdPercentile
 
 
 def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False, shuffle: bool = True, transform=None):
@@ -23,6 +23,8 @@ def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False,
                             transform=transform)
     elif params["dataset"] == 'SDNet2018CleanedThreshold':
         dataset = SDNet2018CleanedThreshold(root_dir=params['data_path'], transform=transform)
+    elif params["dataset"] == 'SDNet2018CleanedThresholdPercentile':
+        dataset = SDNet2018CleanedThresholdPercentile(root_dir=params['data_path'], transform=transform)
     else:
         raise ValueError('Undefined dataset type')
 

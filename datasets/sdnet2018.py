@@ -146,3 +146,7 @@ class SDNet2018(Dataset):
 
 class SDNet2018CleanedThreshold(SDNet2018):
     pass
+
+
+class SDNet2018CleanedThresholdPercentile(SDNet2018):
+    pass
