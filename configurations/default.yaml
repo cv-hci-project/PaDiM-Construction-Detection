@@ -6,16 +6,18 @@ exp_params:
   batch_size: 32
   # batch_count: 50 # Uncomment to set a max amount of batches
   crop_size: 224
-  backbone: "resnet18"
   number_of_embeddings: 100
-  padim_mode: "shared"
+  padim_mode: "vanilla"
   dataloader_workers: 4
+
+backbone_params:
+    backbone: "resnet18"
 
 trainer_params:
   gpu: -1
   max_epochs: 1 # One epoch is enough because PaDiM needs to see each training sample only once
 
 logging_params:
-  save_dir: "/cvhci/temp/p21g3/PyTorch-VAE/logs/"
+  save_dir: "/cvhci/temp/p21g3/PaDiM-Construction-Detection/logs/"
   name: "PaDiM-ResNet18"
   manual_seed: 100
