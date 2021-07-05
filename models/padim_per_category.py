@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from scipy.ndimage import gaussian_filter
-from torch.nn import Parameter
+from torch.nn import Parameter, ParameterList
 
 from models import PaDiMBase
 from utils.utils import get_embedding
@@ -13,12 +13,12 @@ class PaDiMPerCategory(PaDiMBase):
         super().__init__(params=params, backbone_params=backbone_params, device=device)
         self.number_of_categories = self.params["number_of_categories"]
 
-        self.means = []
-        self.covariances = []
+        self.means = ParameterList()
+        self.covariances = ParameterList()
 
-        self.learned_means = []
-        self.learned_covariances = []
-        self.learned_inverse_covariances = []
+        self.learned_means = ParameterList()
+        self.learned_covariances = ParameterList()
+        self.learned_inverse_covariances = ParameterList()
 
         self.counts = []
 
