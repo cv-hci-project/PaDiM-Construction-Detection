@@ -105,7 +105,7 @@ class PaDiMPerCategory(PaDiMBase):
 
             scores_per_category.append(scores)
 
-        return torch.Tensor(scores_per_category, device=self.device)
+        return torch.tensor(scores_per_category, device=self.device)
 
     def _calculate_dist_list(self, embedding, embedding_dimensions: tuple, category: int):
         b, c, h, w = embedding_dimensions
