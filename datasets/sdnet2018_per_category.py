@@ -65,7 +65,7 @@ class SDNet2018PerCategory(Dataset):
         self.train_data_normal, self.val_data_normal, self.test_data_normal = normal_data
         self.train_category_indices_normal, self.val_category_indices_normal, self.test_category_indices_normal = normal_category_indices
 
-        abnormal_data, abnormal_category_indices = self.create_splits(self.data_directories_normal, abnormal_data=True)
+        abnormal_data, abnormal_category_indices = self.create_splits(self.data_directories_abnormal, abnormal_data=True)
 
         self.train_data_abnormal, self.val_data_abnormal, self.test_data_abnormal = abnormal_data
         self.train_category_indices_abnormal, self.val_category_indices_abnormal, self.test_category_indices_abnormal = abnormal_category_indices
