@@ -343,20 +343,20 @@ def main():
             predicted_category_a = predicted_category[current_index_a:current_index_a + batch_size]
 
             for j in range(scores_n.size(1)):
-                new_scores_n.append(scores_n[predicted_category_n[j], j])
-                new_scores_a.append(scores_a[predicted_category_a[j], j])
+                new_scores_n.append(scores_n[predicted_category_n[j], j].cpu().numpy())
+                new_scores_a.append(scores_a[predicted_category_a[j], j].cpu().numpy())
 
                 chosen_thresholds_n.append(category_thresholds[predicted_category_n[j]])
                 chosen_thresholds_a.append(category_thresholds[predicted_category_a[j]])
 
             gt_n = gt_n_tensor[i]
             batch_n = batch_normal[i]
-            save_grid_plot(batch_n, i, gt_n, np.array(new_scores_n, dtype=object), chosen_thresholds_n, v_max, v_min, image_savepath,
+            save_grid_plot(batch_n, i, gt_n, np.array(new_scores_n), chosen_thresholds_n, v_max, v_min, image_savepath,
                            backbone_kind=backbone_kind)
 
             gt_a = gt_a_tensor[i]
             batch_a = batch_abnormal[i]
-            save_grid_plot(batch_a, i, gt_a, np.array(new_scores_a, dtype=object), chosen_thresholds_a, v_max, v_min, image_savepath,
+            save_grid_plot(batch_a, i, gt_a, np.array(new_scores_a), chosen_thresholds_a, v_max, v_min, image_savepath,
                            backbone_kind=backbone_kind)
 
             current_index_n += batch_size
