@@ -78,7 +78,7 @@ def main():
     normal_data_iterator = iter(normal_data_dataloader)
 
     for _ in tqdm(range(batch_count)):
-        batch, _ = next(normal_data_iterator)
+        batch = next(normal_data_iterator)
         padim(batch)
 
     padim.calculate_means_and_covariances()

@@ -61,7 +61,8 @@ class PaDiM(PaDiMBase):
         # TODO we could delete self.means and self.covariances as they are not needed anymore (they are only running
         #  variables to track the batches)
 
-    def forward(self, x, min_max_norm: bool = True):
+    def forward(self, batch, min_max_norm: bool = True):
+        x, _ = batch
         x = x.to(self.device)
 
         with torch.no_grad():
