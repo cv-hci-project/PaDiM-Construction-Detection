@@ -9,12 +9,74 @@ import torchvision.utils as vutils
 import yaml
 from matplotlib import pyplot as plt
 from skimage.segmentation import mark_boundaries
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import precision_recall_curve
 from tqdm import tqdm
 
 from backbones import backbone_kinds
 from models import registered_padim_models
 from utils.dataloader_utils import get_dataloader, get_device, get_transformations, denormalize_batch
-from utils.utils import get_roc_plot_and_threshold, create_mask
+from utils.utils import create_mask
+
+
+def test(predictions):
+    category_thresholds = []
+
+    for category, value in predictions.items():
+        predictions_per_category = np.asarray(value)
+        gt_list = np.asarray(gt_list).flatten()
+
+        # fpr, tpr, thresholds = roc_curve(gt_list, predictions_per_category)
+        # category_thresholds.append(thresholds[np.argmax(tpr - fpr)])
+        #
+        precision, recall, thresholds = precision_recall_curve(gt_list, predictions_per_category)
+        a = 2 * precision * recall
+        b = precision + recall
+        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+        category_thresholds.append(thresholds[np.argmax(f1)])
+
+    differences = np.array([v for v in predictions.values()]) - np.expand_dims(category_thresholds, 1)
+    predicted_category = np.argmin(differences, axis=0)
+
+    # If an element is larger than 0 that means that the difference between value and threshold was non-negative
+    # and therefore the value is above the threshold, meaning it was classified as an anomaly
+    all_predictions = []
+    for i in range(differences.shape[1]):
+        all_predictions.append(differences[predicted_category[i], i])
+
+    calculated_predictions = np.array([x > 0 for x in all_predictions], dtype=int)
+
+    # for i in range(all_predictions.shape[0]):
+    #     for j in range(len(category_thresholds)):
+    #         if predictions[j][i] <= category_thresholds[j]:
+    #             all_predictions[i] = 0
+    #             break
+
+
+def get_roc_plot_and_threshold(predictions, gt_list):
+    predictions = np.asarray(predictions)
+    gt_list = np.asarray(gt_list)
+
+    fpr, tpr, thresholds = roc_curve(gt_list, predictions)
+    img_roc_auc = roc_auc_score(gt_list, predictions)
+
+    fig, ax = plt.subplots(1, 1)
+    fig_img_rocauc = ax
+
+    fig_img_rocauc.plot(fpr, tpr, label="ROC Curve (area = {:.2f})".format(img_roc_auc))
+    ax.set_xlabel("FPR")
+    ax.set_ylabel("TPR")
+    ax.set_title('Receiver operating characteristic')
+    ax.legend(loc="lower right")
+
+    precision, recall, thresholds = precision_recall_curve(gt_list, predictions)
+    a = 2 * precision * recall
+    b = precision + recall
+    f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    best_threshold = thresholds[np.argmax(f1)]
+
+    return (fig, ax), best_threshold
 
 
 def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path, backbone_kind):
@@ -160,6 +222,37 @@ def create_grid_plot(imgs, img_scores, threshold, vmin, vmax, backbone_kind):
     return fig, (ax11, ax12, ax21, ax22)
 
 
+def iterate_through_data(dataloader, _batch_count, _min_max_norm, _number_visualization_batches, abnormal_data: bool):
+    data_iterator = iter(dataloader)
+
+    if not abnormal_data:
+        ground_truth = 0
+    else:
+        ground_truth = 1
+
+    predictions = []
+    visualization_batches = []
+    visualization_score_maps = []
+
+    for i in tqdm(range(_batch_count)):
+        batch = next(data_iterator)
+        labels = batch[1]
+
+        # Dim: 3 x batch_size x crop_size x crop_size
+        score_maps_per_category = padim(batch, min_max_norm=_min_max_norm)
+
+        for j in range(score_maps_per_category.size(1)):
+            current_score_map = score_maps_per_category[:, j, :, :]
+            anomaly_score = current_score_map.reshape(current_score_map.size(0), -1).max(dim=1)[0]
+            predictions.append([anomaly_score, int(labels[j].cpu()), ground_truth])
+
+        if i < _number_visualization_batches:
+            visualization_batches.append(batch)
+            visualization_score_maps.append(score_maps_per_category)
+
+    return predictions, visualization_batches, visualization_score_maps
+
+
 def main():
     parser = argparse.ArgumentParser(description='Validate a PaDiM model')
     parser.add_argument('--load', '-l',
@@ -171,6 +264,18 @@ def main():
                         metavar='VAL_CFG',
                         help='Path to a validation config to overwrite some parameters of the original experiment',
                         default='configurations/validation.yaml')
+    parser.add_argument('--min_mode', '-m',
+                        dest="min_mode",
+                        action="store_true",
+                        help='Use min mode to validate')
+    parser.add_argument('--real_labels', '-r',
+                        dest="real_labels",
+                        action="store_true",
+                        help='Use real labels mode to validate')
+    parser.add_argument('--category_roc', '-cr',
+                        dest="category_roc",
+                        action="store_true",
+                        help='Use category roc mode to validate')
 
     args = parser.parse_args()
 
@@ -185,6 +290,9 @@ def main():
             validation_config = yaml.safe_load(file)
         except yaml.YAMLError as exc:
             print(exc)
+
+    if args.min_mode is False and args.real_labels is False and args.category_roc is False:
+        raise RuntimeError("No validation mode has been selected, please choose at least one.")
 
     gpu_id = validation_config["trainer_params"]["gpu"]
     device = get_device(gpu_id)
@@ -220,93 +328,61 @@ def main():
                                               transform=transform)
 
     try:
-        batch_count = validation_config["exp_params"]["batch_count"]
+        batch_count_n = batch_count_a = validation_config["exp_params"]["batch_count"]
     except KeyError:
-        batch_count = min(len(normal_data_dataloader), len(abnormal_data_dataloader))
+        batch_count_n = len(normal_data_dataloader)
+        batch_count_a = len(abnormal_data_dataloader)
 
     try:
-        assert batch_count <= len(normal_data_dataloader) and batch_count <= len(abnormal_data_dataloader)
+        assert batch_count_n <= len(normal_data_dataloader) and batch_count_a <= len(abnormal_data_dataloader)
     except AssertionError:
-        print("Chosen batch count '{}' is larger than there are available batches for the".format(batch_count) +
-              " validation sets.")
+        print("Chosen batch count '{}' or '{}' is larger than there are".format(batch_count_n, batch_count_a) +
+              " available batches for the validation sets.")
         raise
 
     number_visualization_batches = validation_config["exp_params"]["number_visualization_batches"]
 
-    normal_data_iterator = iter(normal_data_dataloader)
-    abnormal_data_iterator = iter(abnormal_data_dataloader)
+    """
+    1. Durch Dataloader durchgehen und Batch in Padim eingeben -> 3 x Score Map bekommen
+    2. Abspeichern ([3 x ScoreMap.max], label, prediction_label) (label ist das was vom Dataset kommt,
+                                                prediction_label is 0 für normal, 1 für abnormal)
+    3. Das für beide Dataloader machen, jeweils x visualization batches speichern -> also die score maps komplett
+                                                                            abspeichern für die batches
+    4. Für AUC_ROC 
+        - Mit bekannten Labels nutzen, d.h. für jeden Eintrag nehme das ScoreMap.max raus bei dem label übereinstimm
+        - Min -> Nimm die Minimum Score Map.max
+        - So wie es jetzt ist -> Drei mal ROC berechnen dann gucken wo es rausfällt
+        -> Mit resultierender Liste dann AUC_ROC
+        
+    5. Visualization batches:
+        - Je nach gewähltem Verfahren in 4. nehme dann die jeweilige Score Map und nutze die zur Visualisierung
+        - Wahlweise auch dreimal machen 
+    
+    
+    """
 
-    gt_n_tensor = torch.zeros((batch_count, batch_size, 1))
-    gt_a_tensor = torch.ones((batch_count, batch_size, 1))
+    predictions_n, visualization_batches_n, visualization_score_maps_n = iterate_through_data(
+        normal_data_dataloader, batch_count_n, min_max_normalization, number_visualization_batches, abnormal_data=False
+    )
 
-    predictions_n = []
-    predictions_a = []
+    predictions_a, visualization_batches_a, visualization_score_maps_a = iterate_through_data(
+        abnormal_data_dataloader, batch_count_a, min_max_normalization, number_visualization_batches, abnormal_data=True
+    )
 
-    predictions_n_per_category = {}
-    predictions_a_per_category = {}
+    predictions_min_mode = []
+    predictions_real_labels = []
 
-    visualization_batches_n = []
-    visualization_batches_a = []
+    ground_truths = []
 
-    scores_n_tensor = torch.zeros((number_visualization_batches, batch_size, crop_size, crop_size))
-    scores_a_tensor = torch.zeros((number_visualization_batches, batch_size, crop_size, crop_size))
-    batch_normal = torch.zeros((number_visualization_batches, batch_size, 3, crop_size, crop_size))
-    batch_abnormal = torch.zeros((number_visualization_batches, batch_size, 3, crop_size, crop_size))
+    for current_prediction in predictions_a + predictions_n:
+        ground_truths.append(current_prediction[2])
 
-    # calculate score map
-    for i in tqdm(range(batch_count)):
-        # batch_n = next(normal_data_iterator)[0]
-        # batch_a = next(abnormal_data_iterator)[0]
+        if args.min_mode:
+            predictions_min_mode.append(current_prediction[0].min().cpu().numpy())
 
-        batch_n = next(normal_data_iterator)
-        batch_a = next(abnormal_data_iterator)
-
-        _score_n = padim(batch_n, min_max_norm=min_max_normalization)
-        _score_a = padim(batch_a, min_max_norm=min_max_normalization)
-
-        assert _score_n.size() == _score_a.size()
-
-        if len(_score_n.size()) == 4:
-            for category in range(_score_n.size(0)):
-                try:
-                    predictions_n_per_category[category]
-                except KeyError:
-                    predictions_n_per_category[category] = []
-
-                try:
-                    predictions_a_per_category[category]
-                except KeyError:
-                    predictions_a_per_category[category] = []
-
-                predictions_n_per_category[category].extend(_score_n[category].reshape(_score_n.size(1), -1).max(axis=1)[0].cpu().numpy())
-                predictions_a_per_category[category].extend(_score_a[category].reshape(_score_a.size(1), -1).max(axis=1)[0].cpu().numpy())
-        else:
-
-            predictions_n.append(_score_n.reshape(_score_n.shape[0], -1).max(axis=1)[0].cpu().numpy())
-            predictions_a.append(_score_a.reshape(_score_a.shape[0], -1).max(axis=1)[0].cpu().numpy())
-
-        if i < number_visualization_batches:
-            batch_normal[i] = batch_n[0]
-            batch_abnormal[i] = batch_a[0]
-
-            if len(_score_n.size()) == 4:
-                visualization_batches_n.append(_score_n)
-                visualization_batches_a.append(_score_a)
-            else:
-                scores_n_tensor[i] = _score_n
-                scores_a_tensor[i] = _score_a
-
-    for k, v in predictions_a_per_category.items():
-        predictions_n_per_category[k].extend(v)
-
-    # predictions_n = np.array(predictions_n).flatten()
-    # predictions_a = np.array(predictions_a).flatten()
-
-    # predictions = np.concatenate([predictions_n, predictions_a])
-
-    gt_all = torch.cat([gt_n_tensor, gt_a_tensor], 0)
-    gt_all = gt_all.reshape(-1, 1)
-
+        if args.real_labels:
+            index = current_prediction[1] % 3
+            predictions_real_labels.append(current_prediction[0][index].cpu().numpy())
 
     image_savepath = os.path.join(args.experiment_dir, "validation")
 
@@ -319,70 +395,54 @@ def main():
 
     os.makedirs(image_savepath, exist_ok=True)
 
-    # calculate metrics
-    (fig, _), best_threshold, predicted_category, category_thresholds = get_roc_plot_and_threshold(predictions=predictions_n_per_category, gt_list=gt_all)
-    fig.savefig(os.path.join(image_savepath, 'roc_curve.png'), dpi=100)
-    print("Saved ROC to {}".format(image_savepath))
+    if args.min_mode:
+        (fig, _), best_threshold = get_roc_plot_and_threshold(predictions_min_mode, ground_truths)
+        fig.savefig(os.path.join(image_savepath, 'roc_curve_min_mode.png'), dpi=100)
+        print("Saved ROC for min_mode to {}".format(image_savepath))
 
-    if predicted_category is not None:
-        v_max = float(max([x.max() for x in visualization_batches_n + visualization_batches_a]))
-        v_min = float(min([x.min() for x in visualization_batches_n + visualization_batches_a]))
+    if args.real_labels:
+        (fig, _), best_threshold = get_roc_plot_and_threshold(predictions_real_labels, ground_truths)
+        fig.savefig(os.path.join(image_savepath, 'roc_curve_real_labels.png'), dpi=100)
+        print("Saved ROC for real_labels to {}".format(image_savepath))
 
-        current_index_n = 0
-        current_index_a = len(predicted_category) // 2
-        for i in tqdm(range(len(visualization_batches_n))):
-            scores_n = visualization_batches_n[i]
-            scores_a = visualization_batches_a[i]
-            new_scores_n = []
-            new_scores_a = []
-
-            chosen_thresholds_n = []
-            chosen_thresholds_a = []
-
-            predicted_category_n = predicted_category[current_index_n:current_index_n + batch_size]
-            predicted_category_a = predicted_category[current_index_a:current_index_a + batch_size]
-
-            for j in range(scores_n.size(1)):
-                new_scores_n.append(scores_n[predicted_category_n[j], j].cpu().numpy())
-                new_scores_a.append(scores_a[predicted_category_a[j], j].cpu().numpy())
-
-                chosen_thresholds_n.append(category_thresholds[predicted_category_n[j]])
-                chosen_thresholds_a.append(category_thresholds[predicted_category_a[j]])
-
-            gt_n = gt_n_tensor[i]
-            batch_n = batch_normal[i]
-            save_grid_plot(batch_n, i, gt_n, np.array(new_scores_n), chosen_thresholds_n, v_max, v_min, image_savepath,
-                           backbone_kind=backbone_kind)
-
-            gt_a = gt_a_tensor[i]
-            batch_a = batch_abnormal[i]
-            save_grid_plot(batch_a, i, gt_a, np.array(new_scores_a), chosen_thresholds_a, v_max, v_min, image_savepath,
-                           backbone_kind=backbone_kind)
-
-            current_index_n += batch_size
-            current_index_a += batch_size
-    else:
-        scores_all = torch.cat([scores_n_tensor, scores_a_tensor], 0)
-        bn, bz, cs1, cs2 = scores_all.shape
-        scores_all = scores_all.reshape(bn * bz, cs1, cs2)
-
-        v_max = scores_all.max()
-        v_min = scores_all.min()
-
-        for i in tqdm(range(number_visualization_batches)):
-            scores_n = scores_n_tensor[i]
-            gt_n = gt_n_tensor[i]
-            batch_n = batch_normal[i]
-            save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath,
-                           backbone_kind=backbone_kind)
-
-            scores_a = scores_a_tensor[i]
-            gt_a = gt_a_tensor[i]
-            batch_a = batch_abnormal[i]
-            save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath,
-                           backbone_kind=backbone_kind)
-
-    print("Saved validation images to {}".format(image_savepath))
+    # v_max = float(max([x.max() for x in visualization_batches_n + visualization_batches_a]))
+    # v_min = float(min([x.min() for x in visualization_batches_n + visualization_batches_a]))
+    #
+    # current_index_n = 0
+    # current_index_a = len(predicted_category) // 2
+    # for i in tqdm(range(len(visualization_batches_n))):
+    #     scores_n = visualization_batches_n[i]
+    #     scores_a = visualization_batches_a[i]
+    #     new_scores_n = []
+    #     new_scores_a = []
+    #
+    #     chosen_thresholds_n = []
+    #     chosen_thresholds_a = []
+    #
+    #     predicted_category_n = predicted_category[current_index_n:current_index_n + batch_size]
+    #     predicted_category_a = predicted_category[current_index_a:current_index_a + batch_size]
+    #
+    #     for j in range(scores_n.size(1)):
+    #         new_scores_n.append(scores_n[predicted_category_n[j], j].cpu().numpy())
+    #         new_scores_a.append(scores_a[predicted_category_a[j], j].cpu().numpy())
+    #
+    #         chosen_thresholds_n.append(category_thresholds[predicted_category_n[j]])
+    #         chosen_thresholds_a.append(category_thresholds[predicted_category_a[j]])
+    #
+    #     gt_n = gt_n_tensor[i]
+    #     batch_n = batch_normal[i]
+    #     save_grid_plot(batch_n, i, gt_n, np.array(new_scores_n), chosen_thresholds_n, v_max, v_min, image_savepath,
+    #                    backbone_kind=backbone_kind)
+    #
+    #     gt_a = gt_a_tensor[i]
+    #     batch_a = batch_abnormal[i]
+    #     save_grid_plot(batch_a, i, gt_a, np.array(new_scores_a), chosen_thresholds_a, v_max, v_min, image_savepath,
+    #                    backbone_kind=backbone_kind)
+    #
+    #     current_index_n += batch_size
+    #     current_index_a += batch_size
+    #
+    # print("Saved validation images to {}".format(image_savepath))
 
 
 if __name__ == "__main__":
