@@ -150,3 +150,7 @@ class SDNet2018CleanedThreshold(SDNet2018):
 
 class SDNet2018CleanedThresholdPercentile(SDNet2018):
     pass
+
+
+class SDNet2018CleanedPercentileAll(SDNet2018):
+    pass
