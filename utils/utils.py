@@ -9,43 +9,43 @@ from sklearn.metrics import precision_recall_curve
 
 
 def get_roc_plot_and_threshold(predictions, gt_list):
-    predicted_category = None
-    category_thresholds = None
+    # predicted_category = None
+    # category_thresholds = None
 
-    if isinstance(predictions, dict):
-        category_thresholds = []
-
-        for category, value in predictions.items():
-            predictions_per_category = np.asarray(value)
-            gt_list = np.asarray(gt_list).flatten()
-
-            # fpr, tpr, thresholds = roc_curve(gt_list, predictions_per_category)
-            # category_thresholds.append(thresholds[np.argmax(tpr - fpr)])
-            #
-            precision, recall, thresholds = precision_recall_curve(gt_list, predictions_per_category)
-            a = 2 * precision * recall
-            b = precision + recall
-            f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-            category_thresholds.append(thresholds[np.argmax(f1)])
-
-        differences = np.array([v for v in predictions.values()]) - np.expand_dims(category_thresholds, 1)
-        predicted_category = np.argmin(differences, axis=0)
-
-        # If an element is larger than 0 that means that the difference between value and threshold was non-negative
-        # and therefore the value is above the threshold, meaning it was classified as an anomaly
-        all_predictions = []
-        for i in range(differences.shape[1]):
-            all_predictions.append(differences[predicted_category[i], i])
-
-        calculated_predictions = np.array([x > 0 for x in all_predictions], dtype=int)
-
-        # for i in range(all_predictions.shape[0]):
-        #     for j in range(len(category_thresholds)):
-        #         if predictions[j][i] <= category_thresholds[j]:
-        #             all_predictions[i] = 0
-        #             break
-
-        predictions = calculated_predictions
+    # if isinstance(predictions, dict):
+    #     category_thresholds = []
+    #
+    #     for category, value in predictions.items():
+    #         predictions_per_category = np.asarray(value)
+    #         gt_list = np.asarray(gt_list).flatten()
+    #
+    #         # fpr, tpr, thresholds = roc_curve(gt_list, predictions_per_category)
+    #         # category_thresholds.append(thresholds[np.argmax(tpr - fpr)])
+    #         #
+    #         precision, recall, thresholds = precision_recall_curve(gt_list, predictions_per_category)
+    #         a = 2 * precision * recall
+    #         b = precision + recall
+    #         f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+    #         category_thresholds.append(thresholds[np.argmax(f1)])
+    #
+    #     differences = np.array([v for v in predictions.values()]) - np.expand_dims(category_thresholds, 1)
+    #     predicted_category = np.argmin(differences, axis=0)
+    #
+    #     # If an element is larger than 0 that means that the difference between value and threshold was non-negative
+    #     # and therefore the value is above the threshold, meaning it was classified as an anomaly
+    #     all_predictions = []
+    #     for i in range(differences.shape[1]):
+    #         all_predictions.append(differences[predicted_category[i], i])
+    #
+    #     calculated_predictions = np.array([x > 0 for x in all_predictions], dtype=int)
+    #
+    #     # for i in range(all_predictions.shape[0]):
+    #     #     for j in range(len(category_thresholds)):
+    #     #         if predictions[j][i] <= category_thresholds[j]:
+    #     #             all_predictions[i] = 0
+    #     #             break
+    #
+    #     predictions = calculated_predictions
 
     # calculate image-level ROC AUC score
     # img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
@@ -70,7 +70,7 @@ def get_roc_plot_and_threshold(predictions, gt_list):
     f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
     best_threshold = thresholds[np.argmax(f1)]
 
-    return (fig, ax), best_threshold, predicted_category, category_thresholds
+    return (fig, ax), best_threshold  # , predicted_category, category_thresholds
 
 
 def _embedding_concat(x, y):

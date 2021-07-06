@@ -28,9 +28,15 @@ def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False,
                                        abnormal_data=abnormal_data,
                                        transform=transform)
     elif params["dataset"] == 'SDNet2018CleanedThreshold':
-        dataset = SDNet2018CleanedThreshold(root_dir=params['data_path'], transform=transform)
+        dataset = SDNet2018CleanedThreshold(root_dir=params['data_path'],
+                                            split=split,
+                                            abnormal_data=abnormal_data,
+                                            transform=transform)
     elif params["dataset"] == 'SDNet2018CleanedThresholdPercentile':
-        dataset = SDNet2018CleanedThresholdPercentile(root_dir=params['data_path'], transform=transform)
+        dataset = SDNet2018CleanedThresholdPercentile(root_dir=params['data_path'],
+                                                      split=split,
+                                                      abnormal_data=abnormal_data,
+                                                      transform=transform)
     elif params["dataset"] == 'SDNet2018CleanedPercentileAll':
         dataset = SDNet2018CleanedPercentileAll(root_dir=params['data_path'],
                                                 split=split,
