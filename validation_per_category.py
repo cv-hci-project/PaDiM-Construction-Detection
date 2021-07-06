@@ -222,7 +222,8 @@ def create_grid_plot(imgs, img_scores, threshold, vmin, vmax, backbone_kind):
     return fig, (ax11, ax12, ax21, ax22)
 
 
-def iterate_through_data(dataloader, _batch_count, _min_max_norm, _number_visualization_batches, abnormal_data: bool):
+def iterate_through_data(padim, dataloader, _batch_count, _min_max_norm, _number_visualization_batches,
+                         abnormal_data: bool):
     data_iterator = iter(dataloader)
 
     if not abnormal_data:
@@ -362,11 +363,13 @@ def main():
     """
 
     predictions_n, visualization_batches_n, visualization_score_maps_n = iterate_through_data(
-        normal_data_dataloader, batch_count_n, min_max_normalization, number_visualization_batches, abnormal_data=False
+        padim, normal_data_dataloader, batch_count_n, min_max_normalization, number_visualization_batches,
+        abnormal_data=False
     )
 
     predictions_a, visualization_batches_a, visualization_score_maps_a = iterate_through_data(
-        abnormal_data_dataloader, batch_count_a, min_max_normalization, number_visualization_batches, abnormal_data=True
+        padim, abnormal_data_dataloader, batch_count_a, min_max_normalization, number_visualization_batches,
+        abnormal_data=True
     )
 
     predictions_min_mode = []
