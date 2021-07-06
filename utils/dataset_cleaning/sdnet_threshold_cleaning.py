@@ -78,6 +78,11 @@ def main():
 
     try:
         rmtree(args.clean_root_dir)
+    except FileNotFoundError:
+        # Already deleted, pass
+        pass
+
+    try:
         rmtree(dirty_root_dir)
     except FileNotFoundError:
         # Already deleted, pass
@@ -97,11 +102,21 @@ def main():
 
     # Copy images with cracks without changing them
     for _class in classes:
+        # new_data_path = os.path.join(args.clean_root_dir, _class, "C" + _class)
+        # os.makedirs(new_data_path)
+        #
+        # data_path_anomalies = os.path.join(args.root_dir, _class, "C" + _class)
+        # data_anomalies = [os.path.join(data_path_anomalies, img_file) for img_file in os.listdir(data_path_anomalies)]
+        #
+        # for anomaly_img in data_anomalies:
+        #     copyfile(anomaly_img, os.path.join(new_data_path, os.path.basename(anomaly_img)))
+
         clean_data_path = clean_data_and_copy(data_root_dir=args.root_dir, clean_data_root_dir=args.clean_root_dir,
                                               dirty_data_root_dir=dirty_root_dir, category=_class, abnormal_data=True,
                                               copy_dirty_data=False)
 
         print("Copied anomaly data for category '{}' to {}".format(_class, clean_data_path))
+        # print("Copied anomaly data for category '{}' to {}".format(_class, new_data_path))
 
     print("Done")
 
