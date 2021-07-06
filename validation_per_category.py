@@ -82,15 +82,15 @@ def create_img_subplot(img, img_score, threshold, vmin, vmax, backbone_kind):
 
 
 def save_grid_plot(batch, batch_id, label, scores, threshold, v_max, v_min, path, backbone_kind):
-    figures = []
-    num = len(scores)
+    # figures = []
+    # num = len(scores)
     # vmax = scores.max() * 255.
     # vmin = scores.min() * 255.
     vmax = v_max
     vmin = v_min
 
     # TODO: separate in predicted positive/negative rather than GT positive/negative?
-    classified_as = scores.max() > threshold
+    # classified_as = scores.max() > threshold
 
     img_plot, _ = create_grid_plot(batch, scores, threshold=threshold, vmin=vmin, vmax=vmax, backbone_kind=backbone_kind)
     img_plot.set_size_inches(20, 12)
@@ -104,9 +104,13 @@ def create_grid_plot(imgs, img_scores, threshold, vmin, vmax, backbone_kind):
     vis_imgs = [None] * imgs.shape[0]
 
     for i in range(imgs.shape[0]):
+        if isinstance(threshold, list):
+            _threshold = threshold[i]
+        else:
+            _threshold = threshold
         original[i] = denormalize_batch(backbone_kind=backbone_kind, x=imgs[i].cpu().numpy())
         heat_maps[i] = np.copy(img_scores[i])
-        masks[i] = create_mask(img_scores[i], threshold)
+        masks[i] = create_mask(img_scores[i], _threshold)
         vis_imgs[i] = mark_boundaries(original[i], masks[i], color=(1, 0, 0), mode='thick')
 
     # Transform to tensor and prepare for plotting: BxCxWxH
@@ -187,6 +191,11 @@ def main():
 
     print("Device in use: {}".format(device))
 
+    # Use this to replace the data paths, for example when training on the server but validating locally
+    # config["exp_params"]["dataset"] = "SDNET2018"
+    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/SDNET2018"
+    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/Concrete-Crack-Images"
+
     padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"],
                                                                         backbone_params=config["backbone_params"],
                                                                         device=device)
@@ -200,10 +209,6 @@ def main():
 
     config["exp_params"]["batch_size"] = batch_size
     config["exp_params"]["dataloader_workers"] = 0
-
-    # Use this to replace the data paths, for example when training on the server but validating locally
-    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/SDNET2018"
-    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/Concrete-Crack-Images"
 
     backbone_kind = backbone_kinds[config["backbone_params"]["backbone"]]
     min_max_normalization = validation_config["exp_params"]["min_max_normalization"]
@@ -237,42 +242,71 @@ def main():
     predictions_n = []
     predictions_a = []
 
+    predictions_n_per_category = {}
+    predictions_a_per_category = {}
+
+    visualization_batches_n = []
+    visualization_batches_a = []
+
     scores_n_tensor = torch.zeros((number_visualization_batches, batch_size, crop_size, crop_size))
     scores_a_tensor = torch.zeros((number_visualization_batches, batch_size, crop_size, crop_size))
     batch_normal = torch.zeros((number_visualization_batches, batch_size, 3, crop_size, crop_size))
     batch_abnormal = torch.zeros((number_visualization_batches, batch_size, 3, crop_size, crop_size))
+
     # calculate score map
     for i in tqdm(range(batch_count)):
-        batch_n = next(normal_data_iterator)[0]
-        batch_a = next(abnormal_data_iterator)[0]
+        # batch_n = next(normal_data_iterator)[0]
+        # batch_a = next(abnormal_data_iterator)[0]
+
+        batch_n = next(normal_data_iterator)
+        batch_a = next(abnormal_data_iterator)
 
         _score_n = padim(batch_n, min_max_norm=min_max_normalization)
         _score_a = padim(batch_a, min_max_norm=min_max_normalization)
 
-        predictions_n.append(_score_n.reshape(_score_n.shape[0], -1).max(axis=1)[0].cpu().numpy())
-        predictions_a.append(_score_a.reshape(_score_a.shape[0], -1).max(axis=1)[0].cpu().numpy())
+        assert _score_n.size() == _score_a.size()
+
+        if len(_score_n.size()) == 4:
+            for category in range(_score_n.size(0)):
+                try:
+                    predictions_n_per_category[category]
+                except KeyError:
+                    predictions_n_per_category[category] = []
+
+                try:
+                    predictions_a_per_category[category]
+                except KeyError:
+                    predictions_a_per_category[category] = []
+
+                predictions_n_per_category[category].extend(_score_n[category].reshape(_score_n.size(1), -1).max(axis=1)[0].cpu().numpy())
+                predictions_a_per_category[category].extend(_score_a[category].reshape(_score_a.size(1), -1).max(axis=1)[0].cpu().numpy())
+        else:
+
+            predictions_n.append(_score_n.reshape(_score_n.shape[0], -1).max(axis=1)[0].cpu().numpy())
+            predictions_a.append(_score_a.reshape(_score_a.shape[0], -1).max(axis=1)[0].cpu().numpy())
 
         if i < number_visualization_batches:
-            batch_normal[i] = batch_n
-            batch_abnormal[i] = batch_a
+            batch_normal[i] = batch_n[0]
+            batch_abnormal[i] = batch_a[0]
 
-            scores_n_tensor[i] = _score_n
-            scores_a_tensor[i] = _score_a
+            if len(_score_n.size()) == 4:
+                visualization_batches_n.append(_score_n)
+                visualization_batches_a.append(_score_a)
+            else:
+                scores_n_tensor[i] = _score_n
+                scores_a_tensor[i] = _score_a
 
-    predictions_n = np.array(predictions_n).flatten()
-    predictions_a = np.array(predictions_a).flatten()
+    for k, v in predictions_a_per_category.items():
+        predictions_n_per_category[k].extend(v)
 
-    predictions = np.concatenate([predictions_n, predictions_a])
+    # predictions_n = np.array(predictions_n).flatten()
+    # predictions_a = np.array(predictions_a).flatten()
 
-    scores_all = torch.cat([scores_n_tensor, scores_a_tensor], 0)
-    bn, bz, cs1, cs2 = scores_all.shape
-    scores_all = scores_all.reshape(bn * bz, cs1, cs2)
+    # predictions = np.concatenate([predictions_n, predictions_a])
 
     gt_all = torch.cat([gt_n_tensor, gt_a_tensor], 0)
     gt_all = gt_all.reshape(-1, 1)
 
-    v_max = scores_all.max()
-    v_min = scores_all.min()
 
     image_savepath = os.path.join(args.experiment_dir, "validation")
 
@@ -286,22 +320,67 @@ def main():
     os.makedirs(image_savepath, exist_ok=True)
 
     # calculate metrics
-    (fig, _), best_threshold = get_roc_plot_and_threshold(predictions=predictions, gt_list=gt_all)
+    (fig, _), best_threshold, predicted_category, category_thresholds = get_roc_plot_and_threshold(predictions=predictions_n_per_category, gt_list=gt_all)
     fig.savefig(os.path.join(image_savepath, 'roc_curve.png'), dpi=100)
     print("Saved ROC to {}".format(image_savepath))
 
-    for i in tqdm(range(number_visualization_batches)):
-        scores_n = scores_n_tensor[i]
-        gt_n = gt_n_tensor[i]
-        batch_n = batch_normal[i]
-        save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath,
-                       backbone_kind=backbone_kind)
+    if predicted_category is not None:
+        v_max = float(max([x.max() for x in visualization_batches_n + visualization_batches_a]))
+        v_min = float(min([x.min() for x in visualization_batches_n + visualization_batches_a]))
 
-        scores_a = scores_a_tensor[i]
-        gt_a = gt_a_tensor[i]
-        batch_a = batch_abnormal[i]
-        save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath,
-                       backbone_kind=backbone_kind)
+        current_index_n = 0
+        current_index_a = len(predicted_category) // 2
+        for i in tqdm(range(len(visualization_batches_n))):
+            scores_n = visualization_batches_n[i]
+            scores_a = visualization_batches_a[i]
+            new_scores_n = []
+            new_scores_a = []
+
+            chosen_thresholds_n = []
+            chosen_thresholds_a = []
+
+            predicted_category_n = predicted_category[current_index_n:current_index_n + batch_size]
+            predicted_category_a = predicted_category[current_index_a:current_index_a + batch_size]
+
+            for j in range(scores_n.size(1)):
+                new_scores_n.append(scores_n[predicted_category_n[j], j].cpu().numpy())
+                new_scores_a.append(scores_a[predicted_category_a[j], j].cpu().numpy())
+
+                chosen_thresholds_n.append(category_thresholds[predicted_category_n[j]])
+                chosen_thresholds_a.append(category_thresholds[predicted_category_a[j]])
+
+            gt_n = gt_n_tensor[i]
+            batch_n = batch_normal[i]
+            save_grid_plot(batch_n, i, gt_n, np.array(new_scores_n), chosen_thresholds_n, v_max, v_min, image_savepath,
+                           backbone_kind=backbone_kind)
+
+            gt_a = gt_a_tensor[i]
+            batch_a = batch_abnormal[i]
+            save_grid_plot(batch_a, i, gt_a, np.array(new_scores_a), chosen_thresholds_a, v_max, v_min, image_savepath,
+                           backbone_kind=backbone_kind)
+
+            current_index_n += batch_size
+            current_index_a += batch_size
+    else:
+        scores_all = torch.cat([scores_n_tensor, scores_a_tensor], 0)
+        bn, bz, cs1, cs2 = scores_all.shape
+        scores_all = scores_all.reshape(bn * bz, cs1, cs2)
+
+        v_max = scores_all.max()
+        v_min = scores_all.min()
+
+        for i in tqdm(range(number_visualization_batches)):
+            scores_n = scores_n_tensor[i]
+            gt_n = gt_n_tensor[i]
+            batch_n = batch_normal[i]
+            save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath,
+                           backbone_kind=backbone_kind)
+
+            scores_a = scores_a_tensor[i]
+            gt_a = gt_a_tensor[i]
+            batch_a = batch_abnormal[i]
+            save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath,
+                           backbone_kind=backbone_kind)
 
     print("Saved validation images to {}".format(image_savepath))
 
