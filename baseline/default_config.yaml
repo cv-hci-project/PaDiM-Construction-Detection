@@ -1,0 +1,18 @@
+exp_params:
+  dataset: concrete-cracks
+  data_path: "/cvhci/data/construction/Concrete-Cracks"
+  # dataset: SDNET2018
+  # data_path: "/cvhci/data/construction/SDNET2018"
+  architecture: resnet18
+  batch_size: 64
+  resize: 227
+  dataloader_workers: 0
+
+trainer_params:
+  gpu: -1
+  max_epochs: 10
+
+logging_params:
+  save_dir: "/cvhci/temp/p21g3/PaDiM-Construction-Detection/logs/Concrete-Cracks/"
+  name: "Baseline-ResNet18"
+  manual_seed: 100
