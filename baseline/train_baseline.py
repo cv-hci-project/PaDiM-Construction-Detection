@@ -28,7 +28,7 @@ def iterate_dataset(dataloader, model, device, optimizer, criterion, experiment)
         optimizer.zero_grad()
 
         outputs = model(x).flatten()
-        print("Max outputs {} ---- Min outputs {}".format(outputs.max(), outputs.min()))
+        # print("Max outputs {} ---- Min outputs {}".format(outputs.max(), outputs.min()))
 
         loss = criterion(outputs, labels)
         loss.backward()
