@@ -75,7 +75,7 @@ class PaDiMPerCategory(PaDiMBase):
                 for j in range(b):
                     self.covariances[labels[j]][i, :, :] += torch.outer(
                         patch_embeddings[j, :],
-                        patch_embeddings[j, :]) # c * c
+                        patch_embeddings[j, :])  # c * c
                     self.counts[labels[j]] += 1
                     self.means[labels[j]] += patch_embeddings[j, :]
         else:
