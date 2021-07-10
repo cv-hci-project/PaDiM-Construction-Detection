@@ -154,3 +154,57 @@ class SDNet2018CleanedThresholdPercentile(SDNet2018):
 
 class SDNet2018CleanedPercentileAll(SDNet2018):
     pass
+
+
+class SDNet2018NoDistinction(SDNet2018):
+
+    def __init__(self, root_dir, split: str = "train", transform=None):
+        # Set abnormal_data to False but it does not matter as we ignore it in this Dataset loading
+        super().__init__(root_dir=root_dir, split=split, abnormal_data=False, transform=transform)
+
+        self.train_data = self.train_data_normal + self.train_data_abnormal
+        self.val_data = self.val_data_normal + self.val_data_abnormal
+        self.test_data = self.test_data_normal + self.test_data_abnormal
+
+        self.train_data_length = len(self.train_data)
+        self.val_data_length = len(self.val_data)
+        self.test_data_length = len(self.test_data)
+
+    def __len__(self):
+        if self.split == "train":
+            return self.train_data_length
+        elif self.split == "val":
+            return self.val_data_length
+        else:
+            return self.test_data_length
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx) or isinstance(idx, list):
+            raise RuntimeError(
+                "SDNet2018 Dataset was accessed with a list of indices, not sure if this works. Aborting")
+
+        if self.split == "train":
+            data = self.train_data
+            if idx >= self.train_data_normal_length:
+                label = 1
+            else:
+                label = 0
+        elif self.split == "val":
+            data = self.val_data
+            if idx >= self.val_data_normal_length:
+                label = 1
+            else:
+                label = 0
+        else:
+            data = self.test_data
+            if idx >= self.test_data_normal_length:
+                label = 1
+            else:
+                label = 0
+
+        img = Image.open(data[idx])
+
+        if self.transform:
+            img = self.transform(img)
+
+        return img, label

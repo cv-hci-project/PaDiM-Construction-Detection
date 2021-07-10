@@ -82,3 +82,71 @@ class ConcreteCracksDataset(Dataset):
             img = self.transform(img)
 
         return img, label
+
+
+class ConcreteCracksDatasetNoDistinction(ConcreteCracksDataset):
+    def __init__(self, root_dir, split: str = "train", transform=None):
+        super().__init__(root_dir=root_dir, split=split, transform=transform)
+
+        self.train_data = (
+                    [os.path.join(self.data_dir_normal, x) for x in
+                        os.listdir(self.data_dir_normal)[:self.train_index]] +
+                    [os.path.join(self.data_dir_abnormal, x) for x in
+                        os.listdir(self.data_dir_abnormal)[:self.train_index]]
+        )
+
+        self.val_data = (
+                [os.path.join(self.data_dir_normal, x) for x in
+                    os.listdir(self.data_dir_normal)[self.train_index:self.train_index + self.val_index]] +
+                [os.path.join(self.data_dir_abnormal, x) for x in
+                    os.listdir(self.data_dir_abnormal)[self.train_index:self.train_index + self.val_index]]
+        )
+
+        self.test_data = (
+                [os.path.join(self.data_dir_normal, x) for x in
+                    os.listdir(self.data_dir_normal)[self.train_index + self.val_index:]] +
+                [os.path.join(self.data_dir_abnormal, x) for x in
+                    os.listdir(self.data_dir_abnormal)[self.train_index + self.val_index:]]
+        )
+
+        self.train_data_length = len(self.train_data)
+        self.val_data_length = len(self.val_data)
+        self.test_data_length = len(self.test_data)
+
+    def __len__(self):
+        if self.split == "train":
+            return self.train_data_length
+        elif self.split == "val":
+            return self.val_data_length
+        else:
+            return self.test_data_length
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        if self.split == "train":
+            data = self.train_data
+            if idx >= self.train_length:
+                label = 1
+            else:
+                label = 0
+        elif self.split == "val":
+            data = self.val_data
+            if idx >= self.val_length:
+                label = 1
+            else:
+                label = 0
+        else:
+            data = self.train_data
+            if idx >= self.test_length:
+                label = 1
+            else:
+                label = 0
+
+        img = Image.open(data[idx])
+
+        if self.transform:
+            img = self.transform(img)
+
+        return img, label

@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import yaml
 from matplotlib import pyplot as plt
-from sklearn.metrics import precision_recall_curve, roc_curve, roc_auc_score
+from sklearn.metrics import roc_curve, roc_auc_score
 from test_tube import Experiment
 from torch import nn
 from torch import optim
@@ -21,8 +21,9 @@ def iterate_dataset(dataloader, model, device, optimizer, criterion, experiment)
     data_iterator = iter(dataloader)
 
     running_loss = 0.0
+    pbar = tqdm(data_iterator, desc="Loss", position=0, leave=False)
 
-    for batch in tqdm(data_iterator):
+    for batch in pbar:
         x, labels = batch[0].to(device), batch[1].float().to(device)
 
         optimizer.zero_grad()
@@ -37,6 +38,7 @@ def iterate_dataset(dataloader, model, device, optimizer, criterion, experiment)
         running_loss += loss.item()
 
         experiment.log({"loss": loss.item()})
+        pbar.set_description("Loss {:.4f}".format(loss.item()))
 
 
 def validate(dataloader, model, device):
@@ -45,16 +47,18 @@ def validate(dataloader, model, device):
     all_predictions = []
     true_labels = []
 
-    pbar = tqdm(data_iterator, desc="Validation")
+    pbar = tqdm(data_iterator, desc="Validation", position=0)
+
     for batch in pbar:
-        x, labels = batch[0].to(device), batch[1].cpu().numpy()
+        with torch.no_grad():
+            x, labels = batch[0].to(device), batch[1].cpu().numpy()
 
-        outputs = model(x).flatten()
+            outputs = model(x).flatten()
 
-        predictions = (outputs > 0.5).int().cpu().numpy()
+            predictions = (outputs > 0.5).int().cpu().numpy()
 
-        all_predictions.extend(predictions)
-        true_labels.extend(labels)
+            all_predictions.extend(predictions)
+            true_labels.extend(labels)
 
     return all_predictions, true_labels
 
@@ -106,17 +110,8 @@ def main():
                                           transforms.ToTensor(),
                                           set_range])
 
-    normal_train_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=False, shuffle=True,
-                                            transform=transformations)
-
-    normal_val_data_dataloader = get_dataloader(config['exp_params'], train_split=False, abnormal_data=False, shuffle=True,
-                                            transform=transformations)
-
-    abnormal_train_data_dataloader = get_dataloader(config['exp_params'], train_split=True, abnormal_data=True, shuffle=True,
-                                              transform=transformations)
-
-    abnormal_val_data_dataloader = get_dataloader(config['exp_params'], train_split=False, abnormal_data=True, shuffle=True,
-                                              transform=transformations)
+    train_data_loader = get_dataloader(config['exp_params'], train_split=True, shuffle=True, transform=transformations)
+    val_data_loader = get_dataloader(config['exp_params'], train_split=False, shuffle=True, transform=transformations)
 
     max_epochs = config["trainer_params"]["max_epochs"]
 
@@ -134,24 +129,19 @@ def main():
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-    pbar = tqdm(range(max_epochs), desc="Epoch")
-    for epoch in pbar:
-        pbar.set_description("Epoch {}".format(epoch))
-        iterate_dataset(normal_train_data_dataloader, model, device, optimizer, criterion, experiment)
-        iterate_dataset(abnormal_train_data_dataloader, model, device, optimizer, criterion, experiment)
+    for epoch in range(max_epochs):
+        iterate_dataset(train_data_loader, model, device, optimizer, criterion, experiment)
 
         torch.save(model.state_dict(), os.path.join(log_dir, "baseline.pt"))
 
+        print("\nFinished epoch {}".format(epoch))
+
     model.train(False)
 
-    predictions_normal, true_labels_normal = validate(normal_val_data_dataloader, model, device)
-    predictions_abnormal, true_labels_abnormal = validate(abnormal_val_data_dataloader, model, device)
+    predictions, true_labels = validate(val_data_loader, model, device)
 
-    all_predictions = predictions_normal + predictions_abnormal
-    all_true_labels = true_labels_normal + true_labels_abnormal
-
-    fpr, tpr, thresholds = roc_curve(all_true_labels, all_predictions)
-    calculated_roc_auc_score = roc_auc_score(all_true_labels, all_predictions)
+    fpr, tpr, thresholds = roc_curve(true_labels, predictions)
+    calculated_roc_auc_score = roc_auc_score(true_labels, predictions)
 
     fig, ax = plt.subplots(1, 1)
     fig_img_rocauc = ax
@@ -163,6 +153,7 @@ def main():
     ax.legend(loc="lower right")
 
     experiment.add_figure(tag="val_roc_auc", figure=fig)
+    fig.savefig(os.path.join(log_dir, "roc_auc.png"))
 
 
 if __name__ == "__main__":

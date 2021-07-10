@@ -3,8 +3,9 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from datasets import (ConcreteCracksDataset, SDNet2018, SDNet2018CleanedThreshold, SDNet2018CleanedThresholdPercentile,
-                      SDNet2018PerCategory, SDNet2018CleanedPercentileAll)
+from datasets import (ConcreteCracksDataset, ConcreteCracksDatasetNoDistinction, SDNet2018, SDNet2018CleanedThreshold,
+                      SDNet2018CleanedThresholdPercentile, SDNet2018PerCategory, SDNet2018CleanedPercentileAll,
+                      SDNet2018NoDistinction)
 
 
 def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False, shuffle: bool = True, transform=None):
@@ -17,6 +18,10 @@ def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False,
                                         split=split,
                                         abnormal_data=abnormal_data,
                                         transform=transform)
+    elif params["dataset"] == 'concrete-cracks-NoDistinction':
+        dataset = ConcreteCracksDatasetNoDistinction(root_dir=params['data_path'],
+                                                     split=split,
+                                                     transform=transform)
     elif params["dataset"] == 'SDNET2018':
         dataset = SDNet2018(root_dir=params['data_path'],
                             split=split,
@@ -42,6 +47,10 @@ def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False,
                                                 split=split,
                                                 abnormal_data=abnormal_data,
                                                 transform=transform)
+    elif params["dataset"] == 'SDNET2018NoDistinction':
+        dataset = SDNet2018NoDistinction(root_dir=params['data_path'],
+                                         split=split,
+                                         transform=transform)
     else:
         raise ValueError('Undefined dataset type')
 
