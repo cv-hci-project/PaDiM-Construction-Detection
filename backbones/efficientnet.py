@@ -6,7 +6,6 @@ import torch
 from efficientnet_pytorch import EfficientNet
 
 
-
 class EffNet(Module):
 
     embeddings_size = 344

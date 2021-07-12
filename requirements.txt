@@ -8,3 +8,4 @@ matplotlib
 scipy
 scikit-learn
 scikit-image
+efficientnet_pytorch
