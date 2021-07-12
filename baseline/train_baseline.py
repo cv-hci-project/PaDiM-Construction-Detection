@@ -126,9 +126,9 @@ def main():
             config["exp_params"]["architecture"])
         )
 
-    if args.validate_directory is None:
-        model = model.to(device)
+    model = model.to(device)
 
+    if args.validate_directory is None:
         criterion = nn.BCELoss()
         optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
