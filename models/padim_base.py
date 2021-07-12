@@ -29,7 +29,7 @@ class PaDiMBase(Module):
 
         transform = get_transformations(backbone_kind=backbone_kind, crop_size=self.crop_size)
 
-        normal_data_dataloader = get_dataloader(params, train_split=True, abnormal_data=False, shuffle=True,
+        normal_data_dataloader = get_dataloader(params, split="train", abnormal_data=False, shuffle=True,
                                                 transform=transform)
 
         test_batch = next(iter(normal_data_dataloader))[0].to(device)

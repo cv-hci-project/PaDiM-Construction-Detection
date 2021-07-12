@@ -8,10 +8,8 @@ from datasets import (ConcreteCracksDataset, ConcreteCracksDatasetNoDistinction,
                       SDNet2018NoDistinction)
 
 
-def get_dataloader(params: dict, train_split: bool, abnormal_data: bool = False, shuffle: bool = True, transform=None):
+def get_dataloader(params: dict, split: str, abnormal_data: bool = False, shuffle: bool = True, transform=None):
     additional_dataloader_args = {'num_workers': params["dataloader_workers"], 'pin_memory': True}
-
-    split = "train" if train_split else "val"
 
     if params["dataset"] == 'concrete-cracks':
         dataset = ConcreteCracksDataset(root_dir=params['data_path'],

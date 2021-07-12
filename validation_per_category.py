@@ -277,6 +277,10 @@ def main():
                         dest="category_roc",
                         action="store_true",
                         help='Use category roc mode to validate')
+    parser.add_argument('--val_type',
+                        des='val_type',
+                        metavar='STR',
+                        default='val')
 
     args = parser.parse_args()
 
@@ -323,9 +327,9 @@ def main():
     min_max_normalization = validation_config["exp_params"]["min_max_normalization"]
 
     transform = get_transformations(backbone_kind=backbone_kind, crop_size=crop_size)
-    normal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=False,
+    normal_data_dataloader = get_dataloader(config["exp_params"], split=args.val_type, abnormal_data=False,
                                             transform=transform)
-    abnormal_data_dataloader = get_dataloader(config["exp_params"], train_split=False, abnormal_data=True,
+    abnormal_data_dataloader = get_dataloader(config["exp_params"], split=args.val_type, abnormal_data=True,
                                               transform=transform)
 
     try:

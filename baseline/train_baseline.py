@@ -71,6 +71,10 @@ def main():
                         metavar='DIR',
                         help='Path to a pretrained backbone for validation onyl',
                         default=None)
+    parser.add_argument('--val_type',
+                        des='val_type',
+                        metavar='STR',
+                        default='val')
 
     args = parser.parse_args()
 
@@ -112,8 +116,8 @@ def main():
                                           transforms.ToTensor(),
                                           set_range])
 
-    train_data_loader = get_dataloader(config['exp_params'], train_split=True, shuffle=True, transform=transformations)
-    val_data_loader = get_dataloader(config['exp_params'], train_split=False, shuffle=True, transform=transformations)
+    train_data_loader = get_dataloader(config['exp_params'], split="train", shuffle=True, transform=transformations)
+    val_data_loader = get_dataloader(config['exp_params'], split=args.val_type, shuffle=True, transform=transformations)
 
     max_epochs = config["trainer_params"]["max_epochs"]
 
