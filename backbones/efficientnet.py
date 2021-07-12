@@ -11,7 +11,7 @@ class EffNet(Module):
     embeddings_size = 344
     number_of_patches = 64 * 64  # For a crop_size of 224
 
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__()
         self.efficientnet = EfficientNet.from_pretrained('efficientnet-b5')
         self.efficientnet.eval()
