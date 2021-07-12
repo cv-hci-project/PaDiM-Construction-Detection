@@ -29,7 +29,6 @@ def iterate_dataset(dataloader, model, device, optimizer, criterion, experiment)
         optimizer.zero_grad()
 
         outputs = model(x).flatten()
-        # print("Max outputs {} ---- Min outputs {}".format(outputs.max(), outputs.min()))
 
         loss = criterion(outputs, labels)
         loss.backward()
@@ -55,9 +54,7 @@ def validate(dataloader, model, device):
 
             outputs = model(x).flatten()
 
-            predictions = (outputs > 0.5).int().cpu().numpy()
-
-            all_predictions.extend(predictions)
+            all_predictions.extend(outputs.cpu().numpy())
             true_labels.extend(labels)
 
     return all_predictions, true_labels
@@ -69,6 +66,11 @@ def main():
                         dest="filename",
                         metavar='FILE',
                         help='Path to the configuration file')
+    parser.add_argument('--validate_only', '-v',
+                        dest="validate_directory",
+                        metavar='DIR',
+                        help='Path to a pretrained backbone for validation onyl',
+                        default=None)
 
     args = parser.parse_args()
 
@@ -124,17 +126,20 @@ def main():
             config["exp_params"]["architecture"])
         )
 
-    model = model.to(device)
+    if args.validate_directory is None:
+        model = model.to(device)
 
-    criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-    for epoch in range(max_epochs):
-        iterate_dataset(train_data_loader, model, device, optimizer, criterion, experiment)
+        for epoch in range(max_epochs):
+            iterate_dataset(train_data_loader, model, device, optimizer, criterion, experiment)
 
-        torch.save(model.state_dict(), os.path.join(log_dir, "baseline.pt"))
+            torch.save(model.state_dict(), os.path.join(log_dir, "baseline.pt"))
 
-        print("\nFinished epoch {}".format(epoch))
+            print("\nFinished epoch {}".format(epoch))
+    else:
+        model.load_state_dict(torch.load(os.path.join(args.validate_directory, "baseline.pt"), map_location=device))
 
     model.train(False)
 
