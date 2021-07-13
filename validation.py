@@ -298,14 +298,16 @@ def main():
         scores_n = scores_n_tensor[i]
         gt_n = gt_n_tensor[i]
         batch_n = batch_normal[i]
-        save_grid_plot(batch_n, i, gt_n, scores_n, best_threshold, v_max, v_min, image_savepath,
-                       backbone_kind=backbone_kind)
+
+        save_plot_figs(batch=batch_n, batch_id=i, label=gt_n, scores=scores_n, threshold=best_threshold, v_max=v_max,
+                       v_min=v_min, path=image_savepath, backbone_kind=backbone_kind)
 
         scores_a = scores_a_tensor[i]
         gt_a = gt_a_tensor[i]
         batch_a = batch_abnormal[i]
-        save_grid_plot(batch_a, i, gt_a, scores_a, best_threshold, v_max, v_min, image_savepath,
-                       backbone_kind=backbone_kind)
+
+        save_plot_figs(batch=batch_a, batch_id=i, label=gt_a, scores=scores_a, threshold=best_threshold, v_max=v_max,
+                       v_min=v_min, path=image_savepath, backbone_kind=backbone_kind)
 
     print("Saved validation images to {}".format(image_savepath))
 
