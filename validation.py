@@ -193,6 +193,7 @@ def main():
     print("Device in use: {}".format(device))
 
     if "dataset" in validation_config["exp_params"]:
+        print("Changing the validation dataset to {}".format(validation_config["exp_params"]["data_path"]))
         config["exp_params"]["dataset"] = validation_config["exp_params"]["dataset"]
         config["exp_params"]["data_path"] = validation_config["exp_params"]["data_path"]
 
