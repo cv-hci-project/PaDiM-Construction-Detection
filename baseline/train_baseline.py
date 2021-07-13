@@ -72,7 +72,7 @@ def main():
                         help='Path to a pretrained backbone for validation onyl',
                         default=None)
     parser.add_argument('--val_type',
-                        des='val_type',
+                        dest='val_type',
                         metavar='STR',
                         default='val')
 
