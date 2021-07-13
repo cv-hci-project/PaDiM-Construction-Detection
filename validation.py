@@ -192,9 +192,9 @@ def main():
 
     print("Device in use: {}".format(device))
 
-    # Use this to replace the data paths, for example when training on the server but validating locally
-    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/SDNET2018-Cleaned-Threshold"
-    # config["exp_params"]["data_path"] = "/home/pdeubel/PycharmProjects/data/Concrete-Crack-Images"
+    if "dataset" in validation_config["exp_params"]:
+        config["exp_params"]["dataset"] = validation_config["exp_params"]["dataset"]
+        config["exp_params"]["data_path"] = validation_config["exp_params"]["data_path"]
 
     padim = registered_padim_models[config["exp_params"]["padim_mode"]](params=config["exp_params"],
                                                                         backbone_params=config["backbone_params"],
