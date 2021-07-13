@@ -35,6 +35,7 @@ def save_plot_figs(batch, batch_id, label, scores, threshold, v_max, v_min, path
             os.makedirs(save_path)
 
         fig_img.savefig(os.path.join(save_path, name), dpi=100)
+        plt.close(fig_img)
 
 
 def create_img_subplot(img, img_score, threshold, vmin, vmax, backbone_kind):
