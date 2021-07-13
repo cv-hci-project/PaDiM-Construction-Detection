@@ -168,7 +168,7 @@ def main():
                         help='Path to a validation config to overwrite some parameters of the original experiment',
                         default='configurations/validation.yaml')
     parser.add_argument('--val_type',
-                        des='val_type',
+                        dest='val_type',
                         metavar='STR',
                         default='val')
 
