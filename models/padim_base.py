@@ -15,7 +15,7 @@ class PaDiMBase(Module):
         self.device = device
 
         self.params = params
-        self.crop_size = params["crop_size"]
+        self.crop_size = self.params["crop_size"]
 
         self.backbone = backbone_models[backbone_params["backbone"]](**backbone_params)
         backbone_kind = backbone_kinds[backbone_params["backbone"]]
@@ -29,7 +29,7 @@ class PaDiMBase(Module):
 
         transform = get_transformations(backbone_kind=backbone_kind, crop_size=self.crop_size)
 
-        normal_data_dataloader = get_dataloader(params, split="train", abnormal_data=False, shuffle=True,
+        normal_data_dataloader = get_dataloader(self.params, split="train", abnormal_data=False, shuffle=True,
                                                 transform=transform)
 
         test_batch = next(iter(normal_data_dataloader))[0].to(device)
@@ -37,14 +37,24 @@ class PaDiMBase(Module):
 
         self.number_of_patches = feature_1.size(2) * feature_1.size(3)
         embeddings_size = feature_1.size(1) + feature_2.size(1) + feature_3.size(1)
-        self.number_of_embeddings = params["number_of_embeddings"]
+
+        if "number_of_embeddings" in self.params:
+            self.number_of_embeddings = params["number_of_embeddings"]
+
+            self.embedding_ids = Parameter(
+                torch.randperm(embeddings_size, device=self.device)[:self.number_of_embeddings],
+                requires_grad=False
+            )
+        else:
+            self.number_of_embeddings = embeddings_size
+
+            self.embedding_ids = Parameter(
+                torch.arange(0, self.number_of_embeddings, device=self.device),
+                requires_grad=False
+            )
 
         self.n = 0
 
-        self.embedding_ids = Parameter(
-            torch.randperm(embeddings_size, device=self.device)[:self.number_of_embeddings],
-            requires_grad=False
-        )
 
     def calculate_means_and_covariances(self):
         raise NotImplementedError()
