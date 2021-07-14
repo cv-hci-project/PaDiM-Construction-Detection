@@ -5,7 +5,7 @@ from torchvision import transforms
 
 from datasets import (ConcreteCracksDataset, ConcreteCracksDatasetNoDistinction, SDNet2018, SDNet2018CleanedThreshold,
                       SDNet2018CleanedThresholdPercentile, SDNet2018PerCategory, SDNet2018CleanedPercentileAll,
-                      SDNet2018NoDistinction)
+                      SDNet2018NoDistinction, SDNet2018OnlyOneCategory)
 
 
 def get_dataloader(params: dict, split: str, abnormal_data: bool = False, shuffle: bool = True, transform=None):
@@ -49,6 +49,12 @@ def get_dataloader(params: dict, split: str, abnormal_data: bool = False, shuffl
         dataset = SDNet2018NoDistinction(root_dir=params['data_path'],
                                          split=split,
                                          transform=transform)
+    elif params["dataset"] == 'SDNET2018OnlyOneCategory':
+        dataset = SDNet2018OnlyOneCategory(root_dir=params['data_path'],
+                                           category=params["dataset_category"],
+                                           split=split,
+                                           abnormal_data=abnormal_data,
+                                           transform=transform)
     else:
         raise ValueError('Undefined dataset type')
 

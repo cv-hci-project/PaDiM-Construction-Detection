@@ -178,3 +178,96 @@ class SDNet2018PerCategory(Dataset):
             img = self.transform(img)
 
         return img, label
+
+
+class SDNet2018OnlyOneCategory(Dataset):
+    def __init__(self, root_dir, category: str, split: str = "train", abnormal_data: bool = False, transform=None):
+        self.root_dir = root_dir
+        self.transform = transform
+
+        self.category = category
+
+        self.train_split = 0.65
+        self.val_split = 0.15
+        self.test_split = 0.2
+
+        self.possible_splits = [
+            "train",
+            "val",
+            "test"
+        ]
+
+        assert split in self.possible_splits, "Chosen split '{}' is not valid".format(split)
+
+        self.split = split
+        self.abnormal_data = abnormal_data
+
+        self.data_directories_normal = [
+            os.path.join(self.root_dir, self.category, "U" + self.category, _dir) for _dir in
+             os.listdir(os.path.join(self.root_dir, self.category, "U" + self.category))
+        ]
+
+        self.data_directories_abnormal = [
+            os.path.join(self.root_dir, self.category, "C" + self.category, _dir) for _dir in
+            os.listdir(os.path.join(self.root_dir, self.category, "C" + self.category))
+        ]
+
+        self.train_index_normal = round(len(self.data_directories_normal) * self.train_split)
+        self.val_index_normal = round(len(self.data_directories_normal) * self.val_split)
+
+        self.train_data_normal = self.data_directories_normal[:self.train_index_normal]
+        self.val_data_normal = self.data_directories_normal[self.train_index_normal:self.train_index_normal + self.val_index_normal]
+        self.test_data_normal = self.data_directories_normal[self.train_index_normal + self.val_index_normal:]
+
+        self.train_index_abnormal = round(len(self.data_directories_abnormal) * self.train_split)
+        self.val_index_abnormal = round(len(self.data_directories_abnormal) * self.val_split)
+
+        self.train_data_abnormal = self.data_directories_abnormal[:self.train_index_abnormal]
+        self.val_data_abnormal = self.data_directories_abnormal[self.train_index_abnormal:self.train_index_abnormal + self.val_index_abnormal]
+        self.test_data_abnormal = self.data_directories_abnormal[self.train_index_abnormal + self.val_index_abnormal:]
+
+    def __len__(self):
+        if self.split == "train":
+            if not self.abnormal_data:
+                return len(self.train_data_normal)
+            else:
+                return len(self.train_data_abnormal)
+        elif self.split == "val":
+            if not self.abnormal_data:
+                return len(self.val_data_normal)
+            else:
+                return len(self.val_data_abnormal)
+        else:
+            if not self.abnormal_data:
+                return len(self.test_data_normal)
+            else:
+                return len(self.test_data_abnormal)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx) or isinstance(idx, list):
+            raise RuntimeError(
+                "SDNet2018 Dataset was accessed with a list of indices, not sure if this works. Aborting")
+
+        if not self.abnormal_data:
+            label = 0
+            if self.split == "train":
+                data = self.train_data_normal
+            elif self.split == "val":
+                data = self.val_data_normal
+            else:
+                data = self.test_data_normal
+        else:
+            label = 1
+            if self.split == "train":
+                data = self.train_data_abnormal
+            elif self.split == "val":
+                data = self.val_data_abnormal
+            else:
+                data = self.test_data_abnormal
+
+        img = Image.open(data[idx])
+
+        if self.transform:
+            img = self.transform(img)
+
+        return img, label
